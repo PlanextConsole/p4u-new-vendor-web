@@ -49,9 +49,9 @@ export function formatListDayMonthYear(iso?: string): string {
 
 export function statusBadgeClass(status: string): string {
   const s = status.toLowerCase();
-  if (s === "settled" || s === "completed" || s === "paid") return "bg-emerald-100 text-emerald-800";
-  if (s === "rejected" || s === "failed") return "bg-rose-100 text-rose-800";
-  return "bg-amber-50 text-amber-900 ring-1 ring-amber-200/80";
+  if (s === "settled" || s === "completed" || s === "paid") return "bg-success/10 text-success";
+  if (s === "rejected" || s === "failed") return "bg-destructive/10 text-destructive";
+  return "bg-warning/10 text-warning ring-1 ring-warning/20";
 }
 
 export function parseAmount(s: string): number {

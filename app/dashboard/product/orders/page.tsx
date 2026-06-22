@@ -22,7 +22,10 @@ import {
   orderLines,
   statusBadgeClass,
 } from "@/components/vendor/orders/OrderDetailModal";
-import { resolveMediaUrl } from "@/lib/media";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 type TabKey = "all" | "new" | "active" | "done";
 
@@ -68,6 +71,14 @@ function formatListDate(iso?: string): string {
   if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 }
+
+type StatCard = {
+  label: string;
+  value: string;
+  icon: typeof Clock3;
+  iconClass: string;
+  valueClass?: string;
+};
 
 export default function VendorProductOrdersPage() {
   const [me, setMe] = useState<VendorProfile | null>(null);
@@ -121,6 +132,39 @@ export default function VendorProductOrdersPage() {
     return { today, pending, active, revenue };
   }, [items]);
 
+  const statCards: StatCard[] = useMemo(
+    () => [
+      {
+        label: "Today",
+        value: String(stats.today),
+        icon: Clock3,
+        iconClass: "bg-primary/10 text-primary",
+      },
+      {
+        label: "Pending",
+        value: String(stats.pending),
+        icon: Package,
+        iconClass: "bg-warning/10 text-warning",
+        valueClass: "text-warning",
+      },
+      {
+        label: "Active",
+        value: String(stats.active),
+        icon: Truck,
+        iconClass: "bg-info/10 text-info",
+        valueClass: "text-info",
+      },
+      {
+        label: "Revenue",
+        value: formatInr(stats.revenue),
+        icon: CheckCircle2,
+        iconClass: "bg-success/10 text-success",
+        valueClass: "text-success text-2xl",
+      },
+    ],
+    [stats],
+  );
+
   const filtered = useMemo(() => items.filter((o) => bucket(tab, o.status)), [items, tab]);
 
   const tabs: { key: TabKey; label: string }[] = useMemo(
@@ -158,76 +202,54 @@ export default function VendorProductOrdersPage() {
   return (
     <div className="min-w-0 space-y-6">
       <div>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-muted-foreground">
           Manage and track your storefront orders.
           {total > 0 ? (
-            <span className="ml-1 font-medium text-slate-600" aria-live="polite">
+            <span className="ml-1 font-medium text-foreground" aria-live="polite">
               ({total} {total === 1 ? "order" : "orders"} on file)
             </span>
           ) : null}
         </p>
       </div>
 
-      {err ? <p className="text-sm text-red-600">{err}</p> : null}
+      {err ? (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
+          {err}
+        </div>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-[14px] border border-slate-100 bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.06)]">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <p className="text-sm font-medium text-slate-500">Today</p>
-              <p className="mt-2 text-3xl font-bold tracking-tight text-slate-900">{stats.today}</p>
-            </div>
-            <div className="rounded-xl bg-[#20a090]/10 p-2.5 text-[#20a090]">
-              <Clock3 className="h-6 w-6" aria-hidden />
-            </div>
-          </div>
-        </div>
-        <div className="rounded-[14px] border border-slate-100 bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.06)]">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <p className="text-sm font-medium text-slate-500">Pending</p>
-              <p className="mt-2 text-3xl font-bold tracking-tight text-amber-600">{stats.pending}</p>
-            </div>
-            <div className="rounded-xl bg-amber-50 p-2.5 text-amber-600">
-              <Package className="h-6 w-6" aria-hidden />
-            </div>
-          </div>
-        </div>
-        <div className="rounded-[14px] border border-slate-100 bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.06)]">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <p className="text-sm font-medium text-slate-500">Active</p>
-              <p className="mt-2 text-3xl font-bold tracking-tight text-sky-600">{stats.active}</p>
-            </div>
-            <div className="rounded-xl bg-sky-50 p-2.5 text-sky-600">
-              <Truck className="h-6 w-6" aria-hidden />
-            </div>
-          </div>
-        </div>
-        <div className="rounded-[14px] border border-slate-100 bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.06)]">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <p className="text-sm font-medium text-slate-500">Revenue</p>
-              <p className="mt-2 text-2xl font-bold tracking-tight text-emerald-700">
-                {formatInr(stats.revenue)}
-              </p>
-            </div>
-            <div className="rounded-xl bg-emerald-50 p-2.5 text-emerald-600">
-              <CheckCircle2 className="h-6 w-6" aria-hidden />
-            </div>
-          </div>
-        </div>
+        {loading
+          ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)
+          : statCards.map((s) => (
+              <Card key={s.label} className="p-5">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">{s.label}</p>
+                    <p className={cn("mt-2 text-3xl font-bold tracking-tight text-foreground", s.valueClass)}>
+                      {s.value}
+                    </p>
+                  </div>
+                  <div className={cn("rounded-xl p-2.5", s.iconClass)}>
+                    <s.icon className="h-6 w-6" aria-hidden />
+                  </div>
+                </div>
+              </Card>
+            ))}
       </div>
 
-      <div className="inline-flex flex-wrap gap-1 rounded-2xl border border-slate-200/90 bg-slate-50/80 p-1">
+      <div className="inline-flex flex-wrap gap-1 rounded-2xl border border-border bg-muted/50 p-1">
         {tabs.map((t) => (
           <button
             key={t.key}
             type="button"
             onClick={() => setTab(t.key)}
-            className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
-              tab === t.key ? "bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/80" : "text-slate-600 hover:text-slate-900"
-            }`}
+            className={cn(
+              "rounded-xl px-4 py-2.5 text-sm font-semibold transition",
+              tab === t.key
+                ? "bg-card text-foreground shadow-sm ring-1 ring-border"
+                : "text-muted-foreground hover:text-foreground",
+            )}
           >
             {t.label}
           </button>
@@ -235,11 +257,13 @@ export default function VendorProductOrdersPage() {
       </div>
 
       {loading ? (
-        <p className="text-slate-600">Loading orders…</p>
+        <ul className="space-y-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-44 rounded-2xl" />
+          ))}
+        </ul>
       ) : filtered.length === 0 ? (
-        <div className="rounded-[14px] border border-slate-100 bg-white p-14 text-center text-slate-600 shadow-[0_2px_12px_rgba(15,23,42,0.06)]">
-          No orders in this view yet.
-        </div>
+        <Card className="p-14 text-center text-muted-foreground">No orders in this view yet.</Card>
       ) : (
         <ul className="space-y-4">
           {filtered.map((o) => {
@@ -259,74 +283,74 @@ export default function VendorProductOrdersPage() {
                 : typeof first.qty === "number"
                   ? first.qty
                   : 1);
-            const media = (u: string) => resolveMediaUrl(u) || "";
+            const media = (u: string) => {
+              if (!u) return "";
+              if (/^https?:\/\//i.test(u)) return u;
+              const base = (process.env.NEXT_PUBLIC_API_GATEWAY_URL || "").replace(/\/$/, "");
+              if (base) return `${base}${u.startsWith("/") ? u : `/${u}`}`;
+              return u;
+            };
 
             return (
-              <li
-                key={o.id}
-                className="rounded-[14px] border border-slate-100 bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.06)]"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-sm font-semibold text-slate-900 sm:text-base">
-                        {displayOrderRef(o)}
-                      </span>
-                      <span
-                        className={`rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${statusBadgeClass(o.status)}`}
-                      >
-                        {o.status.replace(/_/g, " ")}
-                      </span>
+              <li key={o.id}>
+                <Card className="p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-sm font-semibold text-foreground sm:text-base">
+                          {displayOrderRef(o)}
+                        </span>
+                        <span
+                          className={cn(
+                            "rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize",
+                            statusBadgeClass(o.status),
+                          )}
+                        >
+                          {o.status.replace(/_/g, " ")}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        {customerName(m)} · {formatListDate(o.createdAt)}
+                      </p>
                     </div>
-                    <p className="mt-2 text-sm text-slate-500">
-                      {customerName(m)} · {formatListDate(o.createdAt)}
+                    <p className="text-lg font-bold text-foreground">{formatInr(o.totalAmount)}</p>
+                  </div>
+
+                  <div className="mt-4 flex items-center gap-3">
+                    <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-muted ring-1 ring-border">
+                      {thumb ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={media(String(thumb))} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-[10px] text-muted-foreground">
+                          No image
+                        </div>
+                      )}
+                    </div>
+                    <p className="min-w-0 flex-1 text-sm font-medium text-foreground sm:text-base">
+                      {lines.length ? (
+                        <>
+                          {String(title)} x {qty}
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground">No line items (metadata)</span>
+                      )}
                     </p>
                   </div>
-                  <p className="text-lg font-bold text-slate-900">{formatInr(o.totalAmount)}</p>
-                </div>
 
-                <div className="mt-4 flex items-center gap-3">
-                  <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200">
-                    {thumb ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={media(String(thumb))} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-[10px] text-slate-400">
-                        No image
-                      </div>
-                    )}
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    <Button type="button" variant="outline" onClick={() => openDetail(o)} className="gap-2">
+                      <Eye className="h-4 w-4" aria-hidden />
+                      View
+                    </Button>
+                    {canUpdateStatus(o) ? (
+                      <Button type="button" onClick={() => openDetail(o)} className="gap-2">
+                        <Pencil className="h-4 w-4" aria-hidden />
+                        Update Status
+                      </Button>
+                    ) : null}
                   </div>
-                  <p className="min-w-0 flex-1 text-sm font-medium text-slate-800 sm:text-base">
-                    {lines.length ? (
-                      <>
-                        {String(title)} x {qty}
-                      </>
-                    ) : (
-                      <span className="text-slate-500">No line items (metadata)</span>
-                    )}
-                  </p>
-                </div>
-
-                <div className="mt-5 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => openDetail(o)}
-                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                  >
-                    <Eye className="h-4 w-4" aria-hidden />
-                    View
-                  </button>
-                  {canUpdateStatus(o) ? (
-                    <button
-                      type="button"
-                      onClick={() => openDetail(o)}
-                      className="inline-flex items-center gap-2 rounded-xl bg-[#20a090] px-4 py-2 text-sm font-semibold text-white hover:bg-[#188a7c]"
-                    >
-                      <Pencil className="h-4 w-4" aria-hidden />
-                      Update Status
-                    </button>
-                  ) : null}
-                </div>
+                </Card>
               </li>
             );
           })}

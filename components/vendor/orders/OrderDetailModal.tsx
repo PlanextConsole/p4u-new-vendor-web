@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Building2, Package, Pencil, ShoppingCart, User, X } from "lucide-react";
 import type { VendorCommerceOrder } from "@/lib/api/vendorOrders";
 import { vendorOrdersApi } from "@/lib/api/vendorOrders";
-import { resolveMediaUrl } from "@/lib/media";
 
 const FLOW = [
   "placed",
@@ -109,7 +108,11 @@ export function orderLineThumbnailRaw(line: Record<string, unknown>): string {
 }
 
 function mediaUrl(u: string) {
-  return resolveMediaUrl(u) || "";
+  if (!u) return "";
+  if (/^https?:\/\//i.test(u)) return u;
+  const base = (process.env.NEXT_PUBLIC_API_GATEWAY_URL || "").replace(/\/$/, "");
+  if (base) return `${base}${u.startsWith("/") ? u : `/${u}`}`;
+  return u;
 }
 
 function filledSegments(statusRaw: string): number {
@@ -162,11 +165,11 @@ function totalsFromOrder(o: VendorCommerceOrder) {
 
 export function statusBadgeClass(status: string): string {
   const s = status.toLowerCase();
-  if (s === "completed" || s === "delivered") return "bg-emerald-100 text-emerald-800";
-  if (s === "cancelled" || s === "refunded") return "bg-rose-100 text-rose-800";
-  if (s === "placed" || s === "created" || s === "pending" || s === "new")
-    return "bg-teal-50 text-teal-800 ring-1 ring-teal-200/80";
-  return "bg-sky-100 text-sky-800";
+  if (s === "completed" || s === "delivered") return "bg-success/10 text-success";
+  if (s === "cancelled" || s === "refunded") return "bg-destructive/10 text-destructive";
+  if (s === "placed" || s === "created" || s === "pending" || s === "new" || s === "paid")
+    return "bg-primary/10 text-primary ring-1 ring-primary/20";
+  return "bg-info/10 text-info";
 }
 
 export function OrderDetailModal({
@@ -240,22 +243,22 @@ export function OrderDetailModal({
       role="presentation"
     >
       <div
-        className="flex max-h-[min(92vh,900px)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+        className="flex max-h-[min(92vh,900px)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-card shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-labelledby="order-detail-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-border px-5 py-4 sm:px-6">
           <div className="flex min-w-0 gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#20a090] text-white">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
               <ShoppingCart className="h-5 w-5" aria-hidden />
             </div>
             <div className="min-w-0">
-              <h2 id="order-detail-title" className="truncate text-lg font-bold text-slate-900 sm:text-xl">
+              <h2 id="order-detail-title" className="truncate text-lg font-bold text-foreground sm:text-xl">
                 {refLabel}
               </h2>
-              <p className="mt-0.5 text-sm text-slate-500">{formatDateTime(local.createdAt)}</p>
+              <p className="mt-0.5 text-sm text-muted-foreground">{formatDateTime(local.createdAt)}</p>
               <span
                 className={`mt-2 inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${statusBadgeClass(local.status)}`}
               >
@@ -266,7 +269,7 @@ export function OrderDetailModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -280,14 +283,14 @@ export function OrderDetailModal({
                 <div
                   key={i}
                   className={`h-2 flex-1 rounded-sm first:rounded-l-md last:rounded-r-md ${
-                    i < filled ? "bg-[#20a090]" : "bg-slate-200"
+                    i < filled ? "bg-primary" : "bg-muted"
                   }`}
                 />
               ))}
             </div>
             <div className="mt-2 flex gap-0.5 text-[10px] font-medium sm:text-xs">
               {FLOW_LABELS.map((label) => (
-                <div key={label} className="flex-1 text-center leading-tight text-slate-500">
+                <div key={label} className="flex-1 text-center leading-tight text-muted-foreground">
                   {label}
                 </div>
               ))}
@@ -295,30 +298,30 @@ export function OrderDetailModal({
           </div>
 
           <div className="mb-6 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-xl bg-slate-50/90 px-4 py-3 ring-1 ring-slate-100">
-              <div className="flex items-center gap-2 text-[#20a090]">
+            <div className="rounded-xl bg-muted/50 px-4 py-3 ring-1 ring-border">
+              <div className="flex items-center gap-2 text-primary">
                 <User className="h-4 w-4 shrink-0" aria-hidden />
-                <span className="text-xs font-medium text-slate-500">Customer</span>
+                <span className="text-xs font-medium text-muted-foreground">Customer</span>
               </div>
-              <p className="mt-1 text-base font-semibold text-slate-900">{customerName(meta)}</p>
+              <p className="mt-1 text-base font-semibold text-foreground">{customerName(meta)}</p>
             </div>
-            <div className="rounded-xl bg-slate-50/90 px-4 py-3 ring-1 ring-slate-100">
-              <div className="flex items-center gap-2 text-sky-600">
+            <div className="rounded-xl bg-muted/50 px-4 py-3 ring-1 ring-border">
+              <div className="flex items-center gap-2 text-info">
                 <Building2 className="h-4 w-4 shrink-0" aria-hidden />
-                <span className="text-xs font-medium text-slate-500">Vendor</span>
+                <span className="text-xs font-medium text-muted-foreground">Vendor</span>
               </div>
-              <p className="mt-1 text-base font-semibold text-slate-900">{vendorDisplayName}</p>
+              <p className="mt-1 text-base font-semibold text-foreground">{vendorDisplayName}</p>
             </div>
           </div>
 
           <div className="mb-6">
-            <div className="mb-2 flex items-center gap-2 text-slate-900">
-              <Package className="h-4 w-4 text-slate-600" aria-hidden />
+            <div className="mb-2 flex items-center gap-2 text-foreground">
+              <Package className="h-4 w-4 text-muted-foreground" aria-hidden />
               <span className="text-sm font-semibold">Order Items</span>
             </div>
             <div className="space-y-2">
               {lines.length === 0 ? (
-                <p className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-6 text-center text-sm text-slate-500">
+                <p className="rounded-xl border border-dashed border-border bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground">
                   No line items on this order yet. They appear when checkout stores `metadata.items`.
                 </p>
               ) : (
@@ -327,23 +330,23 @@ export function OrderDetailModal({
                   return (
                   <div
                     key={idx}
-                    className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/50 px-3 py-3"
+                    className="flex items-center gap-3 rounded-xl border border-border bg-muted/30 px-3 py-3"
                   >
-                    <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-slate-200 ring-1 ring-slate-200">
+                    <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-muted ring-1 ring-border">
                       {thumb ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={mediaUrl(thumb)} alt="" className="h-full w-full object-cover" />
                       ) : (
-                        <div className="flex h-full w-full items-center justify-center text-[10px] text-slate-400">
+                        <div className="flex h-full w-full items-center justify-center text-[10px] text-muted-foreground">
                           No img
                         </div>
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-slate-900">{lineTitle(line)}</p>
-                      <p className="text-sm text-slate-500">Qty: {lineQty(line)}</p>
+                      <p className="font-semibold text-foreground">{lineTitle(line)}</p>
+                      <p className="text-sm text-muted-foreground">Qty: {lineQty(line)}</p>
                     </div>
-                    <p className="shrink-0 text-base font-bold text-slate-900">
+                    <p className="shrink-0 text-base font-bold text-foreground">
                       {formatInr(
                         (line.lineTotal as string | undefined) ||
                           (line.unitPrice as string | undefined) ||
@@ -359,37 +362,37 @@ export function OrderDetailModal({
           </div>
 
           {totals ? (
-            <div className="mb-6 rounded-xl bg-slate-50 px-4 py-4 ring-1 ring-slate-100">
-              <div className="flex justify-between text-sm text-slate-600">
+            <div className="mb-6 rounded-xl bg-muted/50 px-4 py-4 ring-1 ring-border">
+              <div className="flex justify-between text-sm text-muted-foreground">
                 <span>Item Total (MRP)</span>
-                <span className="font-medium text-slate-900">{formatInr(totals.item)}</span>
+                <span className="font-medium text-foreground">{formatInr(totals.item)}</span>
               </div>
-              <div className="mt-2 flex justify-between text-sm text-slate-600">
+              <div className="mt-2 flex justify-between text-sm text-muted-foreground">
                 <span>Platform Fee</span>
-                <span className="font-medium text-slate-900">{formatInr(totals.platform)}</span>
+                <span className="font-medium text-foreground">{formatInr(totals.platform)}</span>
               </div>
-              <div className="mt-2 flex justify-between text-sm text-slate-600">
+              <div className="mt-2 flex justify-between text-sm text-muted-foreground">
                 <span>GST on Platform Fee (18%)</span>
-                <span className="font-medium text-slate-900">{formatInr(totals.gst)}</span>
+                <span className="font-medium text-foreground">{formatInr(totals.gst)}</span>
               </div>
-              <div className="my-3 border-t border-slate-200" />
-              <div className="flex justify-between text-base font-bold text-slate-900">
+              <div className="my-3 border-t border-border" />
+              <div className="flex justify-between text-base font-bold text-foreground">
                 <span>Grand Total</span>
                 <span>{formatInr(totals.grand)}</span>
               </div>
               {(paymentRef || gatewayId) && (
                 <>
-                  <div className="my-4 border-t border-slate-200" />
+                  <div className="my-4 border-t border-border" />
                   {paymentRef ? (
-                    <div className="flex justify-between gap-2 text-xs text-slate-600">
+                    <div className="flex justify-between gap-2 text-xs text-muted-foreground">
                       <span>Payment Ref ID</span>
-                      <span className="max-w-[60%] truncate font-mono text-slate-800">{paymentRef}</span>
+                      <span className="max-w-[60%] truncate font-mono text-foreground">{paymentRef}</span>
                     </div>
                   ) : null}
                   {gatewayId ? (
-                    <div className="mt-2 flex justify-between gap-2 text-xs text-slate-600">
+                    <div className="mt-2 flex justify-between gap-2 text-xs text-muted-foreground">
                       <span>Gateway Order ID</span>
-                      <span className="max-w-[60%] truncate font-mono text-slate-800">{gatewayId}</span>
+                      <span className="max-w-[60%] truncate font-mono text-foreground">{gatewayId}</span>
                     </div>
                   ) : null}
                 </>
@@ -398,10 +401,10 @@ export function OrderDetailModal({
           ) : null}
 
           {!readOnly ? (
-            <div className="rounded-xl border border-slate-100 bg-white px-4 py-4">
-              <label className="text-sm font-medium text-slate-600">Update Order Status</label>
+            <div className="rounded-xl border border-border bg-card px-4 py-4">
+              <label className="text-sm font-medium text-muted-foreground">Update Order Status</label>
               <select
-                className="input mt-2 w-full border-[#20a090]/40 py-3 text-base font-medium text-slate-900 focus:border-[#20a090]"
+                className="input mt-2 w-full border-primary/40 py-3 text-base font-medium text-foreground focus:border-primary"
                 value={statusDraft}
                 onChange={(e) => setStatusDraft(e.target.value)}
               >
@@ -414,14 +417,14 @@ export function OrderDetailModal({
             </div>
           ) : null}
 
-          {err ? <p className="mt-3 text-sm text-red-600">{err}</p> : null}
+          {err ? <p className="mt-3 text-sm text-destructive">{err}</p> : null}
         </div>
 
-        <div className="flex shrink-0 flex-wrap justify-end gap-3 border-t border-slate-100 bg-slate-50/50 px-5 py-4 sm:px-6">
+        <div className="flex shrink-0 flex-wrap justify-end gap-3 border-t border-border bg-muted/30 px-5 py-4 sm:px-6">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+            className="rounded-xl border border-border bg-card px-5 py-2.5 text-sm font-semibold text-foreground hover:bg-muted"
           >
             Close
           </button>
@@ -430,7 +433,7 @@ export function OrderDetailModal({
               type="button"
               disabled={saving}
               onClick={() => void saveStatus()}
-              className="inline-flex items-center gap-2 rounded-xl bg-[#20a090] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#188a7c] disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
             >
               <Pencil className="h-4 w-4" aria-hidden />
               {saving ? "Saving…" : "Save changes"}

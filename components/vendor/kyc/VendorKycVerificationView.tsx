@@ -2,8 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { FileText, Loader2, Shield, Upload, X } from "lucide-react";
+import { FileText, Shield, Upload, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getVendorMe, patchVendorProfile, type VendorProfile } from "@/lib/api/vendor";
+import { vendorUploadDocument } from "@/lib/api/vendorDocuments";
 import { KYC_DOC_META, isKycDocSubmitted, kycDocViewUrl, type KycDocKind } from "@/lib/vendor/kycDocuments";
 
 function errMessage(e: unknown): string {
@@ -18,6 +25,12 @@ function isHttpsUrl(s: string): boolean {
   } catch {
     return false;
   }
+}
+
+function isAllowedDocUrl(s: string): boolean {
+  const t = s.trim();
+  if (t.startsWith("/vendor-uploads/")) return true;
+  return isHttpsUrl(t);
 }
 
 export default function VendorKycVerificationView() {
@@ -58,6 +71,30 @@ export default function VendorKycVerificationView() {
     setBanner("");
   }
 
+  async function saveDocumentFromUpload(file: File) {
+    if (!me || !modalKind || readOnly) return;
+    const meta = KYC_DOC_META[modalKind];
+    setSaving(true);
+    setBanner("");
+    try {
+      const url = await vendorUploadDocument(file);
+      const prev =
+        me.documentsJson && typeof me.documentsJson === "object" && !Array.isArray(me.documentsJson)
+          ? { ...me.documentsJson }
+          : {};
+      prev[meta.urlKey] = url;
+      prev[meta.fileNameKey] = file.name;
+      const updated = await patchVendorProfile({ documentsJson: prev });
+      setMe({ ...updated, source: "catalog" });
+      setModalKind(null);
+      setUrlDraft("");
+    } catch (e: unknown) {
+      setBanner(errMessage(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function saveDocumentUrl() {
     if (!me || !modalKind || readOnly) return;
     const trimmed = urlDraft.trim();
@@ -65,8 +102,8 @@ export default function VendorKycVerificationView() {
       setBanner("Please paste a document link.");
       return;
     }
-    if (!isHttpsUrl(trimmed)) {
-      setBanner("Use an HTTPS link (e.g. a Google Drive “anyone with the link” URL).");
+    if (!isAllowedDocUrl(trimmed)) {
+      setBanner("Use an HTTPS link or upload a file below.");
       return;
     }
     const meta = KYC_DOC_META[modalKind];
@@ -91,9 +128,11 @@ export default function VendorKycVerificationView() {
 
   if (loading || !me) {
     return (
-      <div className="flex min-w-0 items-center justify-center gap-2 py-20 text-slate-600">
-        <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-        Loading KYC…
+      <div className="min-w-0 space-y-4 py-6">
+        <Skeleton className="h-24 rounded-2xl" />
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-36 rounded-2xl" />
+        ))}
       </div>
     );
   }
@@ -103,9 +142,9 @@ export default function VendorKycVerificationView() {
   return (
     <div className="min-w-0 space-y-6">
       {readOnly ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+        <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-foreground">
           Your application is still with admin. Document references from your signup appear below. To change them,{" "}
-          <Link href="/onboarding" className="font-semibold text-[#0f766e] underline">
+          <Link href="/onboarding" className="font-semibold text-primary underline">
             edit your application
           </Link>
           .
@@ -113,21 +152,21 @@ export default function VendorKycVerificationView() {
       ) : null}
 
       {kycOverall === "rejected" ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           Some documents were rejected. Update the links below and resubmit so admin can review again.
         </div>
       ) : null}
 
-      {banner ? <p className="text-sm text-red-600">{banner}</p> : null}
+      {banner ? <p className="text-sm text-destructive">{banner}</p> : null}
 
-      <div className="rounded-[14px] border border-[#20a090]/25 bg-[#20a090]/10 px-4 py-4 sm:px-5 sm:py-5">
+      <div className="rounded-2xl border border-primary/25 bg-primary/10 px-4 py-4 sm:px-5 sm:py-5">
         <div className="flex gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-[#20a090] shadow-sm ring-1 ring-[#20a090]/20">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-card text-primary shadow-sm ring-1 ring-primary/20">
             <Shield className="h-5 w-5" aria-hidden />
           </div>
           <div className="min-w-0">
-            <p className="text-base font-bold text-slate-900">Vendor Identity Verification</p>
-            <p className="mt-1 text-sm leading-relaxed text-slate-600">
+            <p className="text-base font-bold text-foreground">Vendor Identity Verification</p>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
               Submit Aadhaar, PAN, and (optionally) GST. Admin will verify within 24–48 hours. Rejected documents can be
               resubmitted.
             </p>
@@ -143,18 +182,18 @@ export default function VendorKycVerificationView() {
           return (
             <li
               key={kind}
-              className="rounded-[14px] border border-slate-200 bg-white p-4 shadow-[0_2px_12px_rgba(15,23,42,0.04)] sm:p-5"
+              className="rounded-2xl border border-border bg-card p-4  sm:p-5"
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#20a090]/12 text-[#20a090]">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary/12 text-primary">
                     <FileText className="h-5 w-5" aria-hidden />
                   </div>
                   <div>
-                    <p className="text-base font-bold text-slate-900">
+                    <p className="text-base font-bold text-foreground">
                       {meta.title}
                       {meta.optional ? (
-                        <span className="ml-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        <span className="ml-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                           Optional
                         </span>
                       ) : null}
@@ -162,12 +201,12 @@ export default function VendorKycVerificationView() {
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  <Upload className="h-4 w-4 text-slate-400" aria-hidden />
+                  <Upload className="h-4 w-4 text-muted-foreground" aria-hidden />
                   <span
                     className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                       submitted
-                        ? "bg-[#20a090]/12 text-[#0f766e] ring-1 ring-[#20a090]/25"
-                        : "bg-slate-100 text-slate-600 ring-1 ring-slate-200/80"
+                        ? "bg-primary/12 text-primary ring-1 ring-primary/25"
+                        : "bg-muted text-muted-foreground ring-1 ring-border/80"
                     }`}
                   >
                     {submitted ? "Submitted" : "Not Submitted"}
@@ -180,19 +219,19 @@ export default function VendorKycVerificationView() {
                     href={viewUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="font-semibold text-[#0f766e] underline hover:text-[#115e59]"
+                    className="font-semibold text-primary underline hover:text-[#115e59]"
                   >
                     View document
                   </a>
                 </p>
               ) : submitted ? (
-                <p className="mt-3 text-xs text-slate-500">Reference on file. Add an HTTPS link to enable “View document”.</p>
+                <p className="mt-3 text-xs text-muted-foreground">Reference on file. Add an HTTPS link to enable “View document”.</p>
               ) : null}
               <button
                 type="button"
                 disabled={readOnly}
                 onClick={() => openModal(kind)}
-                className="mt-4 flex w-full items-center justify-center rounded-xl border border-slate-200 bg-white py-3 text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="mt-4 flex w-full items-center justify-center rounded-xl border border-border bg-card py-3 text-sm font-semibold text-foreground shadow-sm hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Submit Document
               </button>
@@ -208,33 +247,46 @@ export default function VendorKycVerificationView() {
           role="presentation"
         >
           <div
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl sm:p-8"
+            className="w-full max-w-md rounded-2xl bg-card p-6 shadow-2xl sm:p-8"
             role="dialog"
             aria-modal="true"
             aria-labelledby="kyc-modal-title"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">
-              <h2 id="kyc-modal-title" className="text-lg font-bold text-slate-900">
+              <h2 id="kyc-modal-title" className="text-lg font-bold text-foreground">
                 {KYC_DOC_META[modalKind].title}
               </h2>
               <button
                 type="button"
                 onClick={() => setModalKind(null)}
-                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-muted-foreground"
                 aria-label="Close"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <p className="mt-2 text-sm text-slate-600">
-              Paste a secure <strong className="font-semibold text-slate-800">HTTPS</strong> link to your scan (PDF or
-              image). Example: Google Drive shared link set to “Anyone with the link”.
+            <p className="mt-2 text-sm text-muted-foreground">
+              Upload a PDF or image, or paste a secure <strong className="font-semibold text-foreground">HTTPS</strong> link.
             </p>
             <label className="mt-4 block">
-              <span className="text-sm font-semibold text-slate-800">Document URL</span>
+              <span className="text-sm font-semibold text-foreground">Upload file</span>
               <input
-                className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none focus:border-[#20a090] focus:ring-2 focus:ring-[#20a090]/25"
+                type="file"
+                accept="image/*,.pdf,application/pdf"
+                className="mt-2 block w-full text-sm text-foreground file:mr-3 file:rounded-lg file:border-0 file:bg-primary file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white"
+                disabled={saving}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void saveDocumentFromUpload(f);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            <label className="mt-4 block">
+              <span className="text-sm font-semibold text-foreground">Or document URL</span>
+              <input
+                className="mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
                 value={urlDraft}
                 onChange={(e) => setUrlDraft(e.target.value)}
                 placeholder="https://…"
@@ -245,7 +297,7 @@ export default function VendorKycVerificationView() {
               <button
                 type="button"
                 onClick={() => setModalKind(null)}
-                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                className="rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-muted"
               >
                 Cancel
               </button>
@@ -253,7 +305,7 @@ export default function VendorKycVerificationView() {
                 type="button"
                 disabled={saving}
                 onClick={() => void saveDocumentUrl()}
-                className="rounded-xl bg-[#20a090] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#188a7c] disabled:opacity-60"
+                className="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-60"
               >
                 Save
               </button>

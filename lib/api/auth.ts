@@ -87,8 +87,8 @@ export const authApi = {
 
   refreshToken(refreshToken: string) {
     return apiClient.postInternal<LoginResponse>(
-      `${BASE}/public/refresh`,
-      { refreshToken },
+      `${BASE}/public/refresh?refreshToken=${encodeURIComponent(refreshToken)}`,
+      undefined,
       { skipAuthHeader: true, skipAuthRefresh: true },
     );
   },
@@ -96,5 +96,12 @@ export const authApi = {
   /** Revokes refresh token in Keycloak (best-effort). Caller still clears local storage + Firebase. */
   logout(refreshToken: string) {
     return apiClient.post<{ message?: string }>(`${BASE}/logout`, { refreshToken });
+  },
+
+  changePassword(currentPassword: string, newPassword: string) {
+    return apiClient.post<{ message?: string }>(`${BASE}/change-password`, {
+      currentPassword,
+      newPassword,
+    });
   },
 };

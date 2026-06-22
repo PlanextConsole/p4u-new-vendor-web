@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { CreditCard, Plus, Trash2, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getVendorMe, patchVendorProfile, type VendorProfile } from "@/lib/api/vendor";
 import {
   accountTypeOptions,
@@ -14,8 +19,7 @@ import {
   type VendorBankAccount,
 } from "@/lib/vendor/bankAccounts";
 
-const inputClass =
-  "mt-2 block w-full rounded-full border border-slate-200 bg-white px-4 py-3.5 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#20a090] focus:ring-2 focus:ring-[#20a090]/25";
+const inputClass = "mt-2";
 
 function errMessage(e: unknown): string {
   if (e && typeof e === "object" && "message" in e) return String((e as { message: string }).message);
@@ -137,7 +141,11 @@ export default function VendorBankAccountsView() {
 
   if (loading) {
     return (
-      <div className="min-w-0 py-12 text-center text-base text-slate-600">Loading bank accounts…</div>
+      <div className="min-w-0 space-y-4 py-6">
+        <Skeleton className="h-10 w-48" />
+        <Skeleton className="h-28 rounded-2xl" />
+        <Skeleton className="h-28 rounded-2xl" />
+      </div>
     );
   }
 
@@ -145,102 +153,91 @@ export default function VendorBankAccountsView() {
     <div className="min-w-0 space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-base text-slate-500">Manage your bank accounts for settlement payouts.</p>
+          <p className="text-base text-muted-foreground">Manage your bank accounts for settlement payouts.</p>
         </div>
-        <button
-          type="button"
-          onClick={() => openAdd()}
-          disabled={readOnly || saving}
-          className="inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-xl bg-[#20a090] px-5 py-3 text-base font-semibold text-white shadow-sm hover:bg-[#188a7c] disabled:cursor-not-allowed disabled:opacity-50"
-        >
+        <Button type="button" onClick={() => openAdd()} disabled={readOnly || saving} className="shrink-0 gap-2 self-start">
           <Plus className="h-5 w-5 shrink-0" aria-hidden />
           Add Account
-        </button>
+        </Button>
       </div>
 
       {readOnly ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+        <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-foreground">
           Your profile is still pending approval. Bank details shown here come from your application. After approval,
           you can add or remove accounts from this page.{" "}
-          <Link href="/onboarding" className="font-semibold text-[#0f766e] underline">
+          <Link href="/onboarding" className="font-semibold text-primary underline">
             Edit application
           </Link>
         </div>
       ) : null}
 
-      {banner ? <p className="text-sm text-red-600">{banner}</p> : null}
+      {banner ? <p className="text-sm text-destructive">{banner}</p> : null}
 
       {accounts.length === 0 ? (
-        <div className="rounded-[14px] border border-dashed border-slate-200 bg-white px-6 py-14 text-center shadow-[0_2px_12px_rgba(15,23,42,0.04)]">
-          <CreditCard className="mx-auto h-10 w-10 text-slate-300" aria-hidden />
-          <p className="mt-3 text-base font-medium text-slate-700">No bank accounts yet</p>
-          <p className="mt-1 text-sm text-slate-500">Add an account to receive settlement payouts.</p>
-        </div>
+        <Card className="border-dashed px-6 py-14 text-center">
+          <CreditCard className="mx-auto h-10 w-10 text-muted-foreground/40" aria-hidden />
+          <p className="mt-3 text-base font-medium text-foreground">No bank accounts yet</p>
+          <p className="mt-1 text-sm text-muted-foreground">Add an account to receive settlement payouts.</p>
+        </Card>
       ) : (
         <ul className="space-y-4">
           {accounts.map((a) => (
-            <li
-              key={a.id}
-              className="flex flex-wrap items-start gap-4 rounded-[14px] border border-[#20a090]/25 bg-[#20a090]/10 px-4 py-4 sm:px-5 sm:py-5"
-            >
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white text-[#20a090] shadow-sm ring-1 ring-[#20a090]/20">
+            <li key={a.id}>
+              <Card className="flex flex-wrap items-start gap-4 border-primary/25 bg-primary/5 px-4 py-4 sm:px-5 sm:py-5">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-card text-primary shadow-sm ring-1 ring-primary/20">
                 <CreditCard className="h-6 w-6" aria-hidden />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-lg font-bold text-slate-900">{a.bankName || "—"}</span>
+                  <span className="text-lg font-bold text-foreground">{a.bankName || "—"}</span>
                   {a.isPrimary ? (
-                    <span className="rounded-full bg-[#20a090] px-2.5 py-0.5 text-xs font-semibold text-white">
+                    <span className="rounded-full bg-primary px-2.5 py-0.5 text-xs font-semibold text-primary-foreground">
                       Primary
                     </span>
                   ) : (
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
+                      size="sm"
                       disabled={saving || readOnly}
                       onClick={() => void setPrimary(a.id)}
-                      className="rounded-full border border-[#20a090]/40 bg-white px-2.5 py-0.5 text-xs font-semibold text-[#0f766e] hover:bg-white/80 disabled:opacity-50"
+                      className="h-auto rounded-full px-2.5 py-0.5 text-xs"
                     >
                       Make primary
-                    </button>
+                    </Button>
                   )}
                 </div>
-                <p className="mt-1 text-base text-slate-800">{a.accountHolderName || "—"}</p>
-                <p className="mt-1 text-sm text-slate-600">
+                <p className="mt-1 text-base text-foreground">{a.accountHolderName || "—"}</p>
+                <p className="mt-1 text-sm text-muted-foreground">
                   A/C: {maskAccountNumber(a.accountNumber)} • IFSC: {a.ifscCode || "—"} • {a.accountType}
                 </p>
               </div>
               <div className="ml-auto flex shrink-0 flex-col items-end gap-2">
                 {confirmDeleteId === a.id ? (
-                  <div className="flex flex-wrap items-center gap-2 rounded-lg bg-white/90 px-2 py-2 shadow-sm ring-1 ring-slate-200">
-                    <span className="text-xs font-medium text-slate-700">Remove this account?</span>
-                    <button
-                      type="button"
-                      className="rounded-lg px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-100"
-                      onClick={() => setConfirmDeleteId(null)}
-                    >
+                  <div className="flex flex-wrap items-center gap-2 rounded-lg bg-card/90 px-2 py-2 shadow-sm ring-1 ring-border">
+                    <span className="text-xs font-medium text-foreground">Remove this account?</span>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setConfirmDeleteId(null)}>
                       Cancel
-                    </button>
-                    <button
-                      type="button"
-                      className="rounded-lg bg-red-600 px-2 py-1 text-xs font-semibold text-white hover:bg-red-700"
-                      onClick={() => void removeAccount(a.id)}
-                      disabled={saving || readOnly}
-                    >
+                    </Button>
+                    <Button type="button" size="sm" variant="destructive" onClick={() => void removeAccount(a.id)} disabled={saving || readOnly}>
                       Remove
-                    </button>
+                    </Button>
                   </div>
                 ) : (
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon"
                     disabled={readOnly || saving}
                     onClick={() => setConfirmDeleteId(a.id)}
-                    className="rounded-lg p-2 text-red-600 hover:bg-red-50 disabled:opacity-40"
+                    className="text-destructive hover:text-destructive"
                     aria-label="Delete bank account"
                   >
                     <Trash2 className="h-5 w-5" aria-hidden />
-                  </button>
+                  </Button>
                 )}
               </div>
+              </Card>
             </li>
           ))}
         </ul>
@@ -253,54 +250,49 @@ export default function VendorBankAccountsView() {
           role="presentation"
         >
           <div
-            className="max-h-[min(92vh,720px)] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl sm:p-8"
+            className="max-h-[min(92vh,720px)] w-full max-w-lg overflow-y-auto rounded-2xl bg-card p-6 shadow-2xl sm:p-8"
             role="dialog"
             aria-modal="true"
             aria-labelledby="bank-add-title"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">
-              <h2 id="bank-add-title" className="text-xl font-bold text-slate-900 sm:text-2xl">
+              <h2 id="bank-add-title" className="text-xl font-bold text-foreground sm:text-2xl">
                 Add bank account
               </h2>
-              <button
-                type="button"
-                onClick={() => setModalOpen(false)}
-                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                aria-label="Close"
-              >
+              <Button type="button" variant="ghost" size="icon" onClick={() => setModalOpen(false)} aria-label="Close">
                 <X className="h-5 w-5" />
-              </button>
+              </Button>
             </div>
-            <p className="mt-1 text-sm text-slate-500">Details are stored securely for payouts.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Details are stored securely for payouts.</p>
 
             <div className="mt-6 space-y-5">
               <label className="block">
-                <span className="text-base font-semibold text-slate-900">Bank Name</span>
-                <input
+                <Label>Bank Name</Label>
+                <Input
                   className={inputClass}
                   placeholder="e.g. State Bank of India"
                   value={form.bankName}
                   onChange={(e) => setForm((f) => ({ ...f, bankName: e.target.value }))}
                   autoComplete="organization"
                 />
-                {formErrors.bankName ? <p className="mt-1 text-sm text-red-600">{formErrors.bankName}</p> : null}
+                {formErrors.bankName ? <p className="mt-1 text-sm text-destructive">{formErrors.bankName}</p> : null}
               </label>
               <label className="block">
-                <span className="text-base font-semibold text-slate-900">Account Holder Name</span>
-                <input
+                <Label>Account Holder Name</Label>
+                <Input
                   className={inputClass}
                   value={form.accountHolderName}
                   onChange={(e) => setForm((f) => ({ ...f, accountHolderName: e.target.value }))}
                   autoComplete="name"
                 />
                 {formErrors.accountHolderName ? (
-                  <p className="mt-1 text-sm text-red-600">{formErrors.accountHolderName}</p>
+                  <p className="mt-1 text-sm text-destructive">{formErrors.accountHolderName}</p>
                 ) : null}
               </label>
               <label className="block">
-                <span className="text-base font-semibold text-slate-900">Account Number</span>
-                <input
+                <Label>Account Number</Label>
+                <Input
                   className={inputClass}
                   inputMode="numeric"
                   autoComplete="off"
@@ -308,12 +300,12 @@ export default function VendorBankAccountsView() {
                   onChange={(e) => setForm((f) => ({ ...f, accountNumber: e.target.value.replace(/\D/g, "") }))}
                 />
                 {formErrors.accountNumber ? (
-                  <p className="mt-1 text-sm text-red-600">{formErrors.accountNumber}</p>
+                  <p className="mt-1 text-sm text-destructive">{formErrors.accountNumber}</p>
                 ) : null}
               </label>
               <label className="block">
-                <span className="text-base font-semibold text-slate-900">Confirm Account Number</span>
-                <input
+                <Label>Confirm Account Number</Label>
+                <Input
                   className={inputClass}
                   placeholder="Re-enter account number"
                   inputMode="numeric"
@@ -324,12 +316,12 @@ export default function VendorBankAccountsView() {
                   }
                 />
                 {formErrors.confirmAccountNumber ? (
-                  <p className="mt-1 text-sm text-red-600">{formErrors.confirmAccountNumber}</p>
+                  <p className="mt-1 text-sm text-destructive">{formErrors.confirmAccountNumber}</p>
                 ) : null}
               </label>
               <label className="block">
-                <span className="text-base font-semibold text-slate-900">IFSC Code</span>
-                <input
+                <Label>IFSC Code</Label>
+                <Input
                   className={inputClass}
                   placeholder="e.g. SBIN0001234"
                   value={form.ifscCode}
@@ -337,13 +329,13 @@ export default function VendorBankAccountsView() {
                   maxLength={11}
                   autoComplete="off"
                 />
-                {formErrors.ifscCode ? <p className="mt-1 text-sm text-red-600">{formErrors.ifscCode}</p> : null}
+                {formErrors.ifscCode ? <p className="mt-1 text-sm text-destructive">{formErrors.ifscCode}</p> : null}
               </label>
               <label className="block">
-                <span className="text-base font-semibold text-slate-900">Account Type</span>
+                <Label>Account Type</Label>
                 <div className="relative mt-2">
                   <select
-                    className={`${inputClass} appearance-none pr-10`}
+                    className="flex h-10 w-full appearance-none rounded-xl border border-input bg-background px-3 py-2 pr-10 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     value={form.accountType}
                     onChange={(e) => setForm((f) => ({ ...f, accountType: e.target.value }))}
                   >
@@ -353,27 +345,18 @@ export default function VendorBankAccountsView() {
                       </option>
                     ))}
                   </select>
-                  <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500">▾</span>
+                  <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground">▾</span>
                 </div>
               </label>
             </div>
 
             <div className="mt-8 flex flex-wrap justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setModalOpen(false)}
-                className="rounded-full border border-slate-200 px-6 py-3 text-base font-semibold text-slate-700 hover:bg-slate-50"
-              >
+              <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>
                 Cancel
-              </button>
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => void submitAdd()}
-                className="rounded-full bg-[#20a090] px-6 py-3 text-base font-semibold text-white hover:bg-[#188a7c] disabled:opacity-60"
-              >
+              </Button>
+              <Button type="button" disabled={saving} onClick={() => void submitAdd()}>
                 Save account
-              </button>
+              </Button>
             </div>
           </div>
         </div>

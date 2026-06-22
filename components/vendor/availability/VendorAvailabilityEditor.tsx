@@ -1,7 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarClock, Loader2, Save, Trash2 } from "lucide-react";
+import { CalendarClock, Save, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   vendorBookingAvailabilityApi,
   defaultBookingAvailability,
@@ -163,24 +166,25 @@ export function VendorAvailabilityEditor() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center gap-2 py-20 text-slate-600">
-        <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-        Loading availability…
+      <div className="space-y-4 py-6">
+        <Skeleton className="h-24 rounded-2xl" />
+        <Skeleton className="h-64 rounded-2xl" />
+        <Skeleton className="h-48 rounded-2xl" />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {err ? <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{err}</div> : null}
-      {ok ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">{ok}</div> : null}
+      {err ? <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">{err}</div> : null}
+      {ok ? <div className="rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">{ok}</div> : null}
 
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-[14px] border border-slate-100 bg-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm">
         <div className="flex items-start gap-3">
-          <CalendarClock className="mt-0.5 h-6 w-6 text-[#20a090]" aria-hidden />
+          <CalendarClock className="mt-0.5 h-6 w-6 text-primary" aria-hidden />
           <div>
-            <p className="text-base font-semibold text-slate-900">Today&apos;s Status</p>
-            <p className="text-sm text-slate-600">Quick on/off for today only. Customers won&apos;t see slots today when off.</p>
+            <p className="text-base font-semibold text-foreground">Today&apos;s Status</p>
+            <p className="text-sm text-muted-foreground">Quick on/off for today only. Customers won&apos;t see slots today when off.</p>
           </div>
         </div>
         <label className="relative inline-flex cursor-pointer items-center">
@@ -190,16 +194,16 @@ export function VendorAvailabilityEditor() {
             checked={!state.todayClosed}
             onChange={(e) => setState((s) => ({ ...s, todayClosed: !e.target.checked }))}
           />
-          <span className="h-9 w-16 rounded-full bg-slate-200 transition peer-checked:bg-[#20a090]" />
+          <span className="h-9 w-16 rounded-full bg-muted transition peer-checked:bg-primary" />
           <span className="absolute left-1 top-1 h-7 w-7 rounded-full bg-white shadow transition peer-checked:translate-x-7" />
         </label>
       </div>
 
-      <div className="rounded-[14px] border border-slate-100 bg-white p-5 shadow-sm">
+      <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-base font-semibold text-slate-900">Manage Time Slots</p>
-            <p className="text-sm text-slate-600">
+            <p className="text-base font-semibold text-foreground">Manage Time Slots</p>
+            <p className="text-sm text-muted-foreground">
               Working hours per day, buffer between generated slots, optional custom windows shoppers can book.
             </p>
           </div>
@@ -207,16 +211,16 @@ export function VendorAvailabilityEditor() {
             type="button"
             disabled={saving}
             onClick={() => void save()}
-            className="inline-flex items-center gap-2 rounded-xl bg-[#20a090] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#188a7c] disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 disabled:opacity-60"
           >
             <Save className="h-4 w-4" />
             Save
           </button>
         </div>
 
-        <div className="mb-6 flex flex-wrap items-end gap-4 border-b border-slate-100 pb-6">
+        <div className="mb-6 flex flex-wrap items-end gap-4 border-b border-border pb-6">
           <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Default slot length</span>
+            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Default slot length</span>
             <input
               type="number"
               min={15}
@@ -227,7 +231,7 @@ export function VendorAvailabilityEditor() {
                 setState((s) => ({ ...s, defaultSlotMinutes: Math.min(480, Math.max(15, parseInt(e.target.value, 10) || 60)) }))
               }
             />
-            <span className="ml-2 text-sm text-slate-500">minutes (when no custom slots)</span>
+            <span className="ml-2 text-sm text-muted-foreground">minutes (when no custom slots)</span>
           </label>
         </div>
 
@@ -236,16 +240,16 @@ export function VendorAvailabilityEditor() {
             const k = String(d);
             const row = state.weekly[k];
             return (
-              <div key={k} className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+              <div key={k} className="rounded-xl border border-border bg-muted/50/50 p-4">
                 <div className="flex flex-wrap items-center gap-4">
                   <label className="flex min-w-[140px] items-center gap-2">
                     <input
                       type="checkbox"
-                      className="h-4 w-4 rounded border-slate-300 text-[#20a090]"
+                      className="h-4 w-4 rounded border-border text-primary"
                       checked={row.enabled}
                       onChange={(e) => setDay(k, { enabled: e.target.checked })}
                     />
-                    <span className="font-semibold text-slate-900">{DAY_LABELS[d]}</span>
+                    <span className="font-semibold text-foreground">{DAY_LABELS[d]}</span>
                   </label>
                   {row.enabled ? (
                     <>
@@ -256,7 +260,7 @@ export function VendorAvailabilityEditor() {
                           value={row.start}
                           onChange={(e) => setDay(k, { start: e.target.value })}
                         />
-                        <span className="text-slate-500">to</span>
+                        <span className="text-muted-foreground">to</span>
                         <input
                           type="time"
                           className="input w-[7.5rem] py-2 text-sm"
@@ -265,7 +269,7 @@ export function VendorAvailabilityEditor() {
                         />
                       </div>
                       <label className="flex items-center gap-2 text-sm">
-                        <span className="text-slate-600">Buffer</span>
+                        <span className="text-muted-foreground">Buffer</span>
                         <input
                           type="number"
                           min={0}
@@ -274,18 +278,18 @@ export function VendorAvailabilityEditor() {
                           value={row.bufferMinutes}
                           onChange={(e) => setDay(k, { bufferMinutes: Math.max(0, parseInt(e.target.value, 10) || 0) })}
                         />
-                        <span className="text-slate-500">min</span>
+                        <span className="text-muted-foreground">min</span>
                       </label>
                     </>
                   ) : null}
                 </div>
 
                 {row.enabled ? (
-                  <div className="mt-4 border-t border-slate-200/80 pt-4">
+                  <div className="mt-4 border-t border-border/80 pt-4">
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                       <div>
-                        <p className="text-sm font-semibold text-slate-800">Custom Time Slots</p>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-sm font-semibold text-foreground">Custom Time Slots</p>
+                        <p className="text-xs text-muted-foreground">
                           If empty, bookable times are auto-generated from working hours using default slot length + buffer.
                           Add explicit windows to offer those as discrete choices.
                         </p>
@@ -293,37 +297,37 @@ export function VendorAvailabilityEditor() {
                       <button
                         type="button"
                         onClick={() => addCustomSlot(k)}
-                        className="text-sm font-semibold text-[#20a090] hover:underline"
+                        className="text-sm font-semibold text-primary hover:underline"
                       >
                         + Add Slot
                       </button>
                     </div>
                     {row.customSlots.length === 0 ? (
-                      <p className="text-xs text-slate-500">No custom slots — generation uses working hours.</p>
+                      <p className="text-xs text-muted-foreground">No custom slots — generation uses working hours.</p>
                     ) : (
                       <ul className="space-y-2">
                         {row.customSlots.map((slot, idx) => (
-                          <li key={`${k}-${idx}`} className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2">
+                          <li key={`${k}-${idx}`} className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card px-3 py-2">
                             <input
                               type="time"
                               className="input w-[7rem] py-1.5 text-sm"
                               value={slot.start}
                               onChange={(e) => updateCustomSlot(k, idx, { start: e.target.value })}
                             />
-                            <span className="text-slate-400">–</span>
+                            <span className="text-muted-foreground">–</span>
                             <input
                               type="time"
                               className="input w-[7rem] py-1.5 text-sm"
                               value={slot.end}
                               onChange={(e) => updateCustomSlot(k, idx, { end: e.target.value })}
                             />
-                            <span className="text-xs text-slate-500">
+                            <span className="text-xs text-muted-foreground">
                               {format12h(slot.start)} – {format12h(slot.end)}
                             </span>
                             <button
                               type="button"
                               aria-label="Remove slot"
-                              className="ml-auto text-red-600 hover:text-red-800"
+                              className="ml-auto text-destructive hover:text-destructive"
                               onClick={() => removeCustomSlot(k, idx)}
                             >
                               <Trash2 className="h-4 w-4" />
@@ -340,19 +344,19 @@ export function VendorAvailabilityEditor() {
         </div>
       </div>
 
-      <div className="rounded-[14px] border border-slate-100 bg-white p-5 shadow-sm">
-        <p className="text-base font-semibold text-slate-900">Holidays &amp; Date-Specific Off</p>
-        <p className="mt-1 text-sm text-slate-600">
+      <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <p className="text-base font-semibold text-foreground">Holidays &amp; Date-Specific Off</p>
+        <p className="mt-1 text-sm text-muted-foreground">
           Mark specific upcoming dates as unavailable. (Blocking when bookings already exist can be enforced in a later
           release.)
         </p>
         <div className="mt-4 flex flex-wrap items-end gap-3">
           <label className="block">
-            <span className="text-xs font-semibold text-slate-600">Date</span>
+            <span className="text-xs font-semibold text-muted-foreground">Date</span>
             <input type="date" className="input mt-1 py-2" value={offDate} onChange={(e) => setOffDate(e.target.value)} />
           </label>
           <label className="block min-w-[200px] flex-1">
-            <span className="text-xs font-semibold text-slate-600">Reason (optional)</span>
+            <span className="text-xs font-semibold text-muted-foreground">Reason (optional)</span>
             <input
               className="input mt-1 w-full py-2"
               placeholder="Holiday, leave, etc."
@@ -363,22 +367,22 @@ export function VendorAvailabilityEditor() {
           <button
             type="button"
             onClick={addDateOff}
-            className="rounded-xl bg-[#20a090] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#188a7c]"
+            className="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary/90"
           >
             + Mark Off
           </button>
         </div>
         {state.dateOffs.length === 0 ? (
-          <p className="mt-4 text-sm text-slate-500">No upcoming days marked off.</p>
+          <p className="mt-4 text-sm text-muted-foreground">No upcoming days marked off.</p>
         ) : (
           <ul className="mt-4 space-y-2">
             {state.dateOffs.map((o) => (
-              <li key={o.date} className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm">
+              <li key={o.date} className="flex items-center justify-between rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm">
                 <span>
-                  <span className="font-medium text-slate-900">{o.date}</span>
-                  {o.reason ? <span className="text-slate-600"> — {o.reason}</span> : null}
+                  <span className="font-medium text-foreground">{o.date}</span>
+                  {o.reason ? <span className="text-muted-foreground"> — {o.reason}</span> : null}
                 </span>
-                <button type="button" className="text-red-600 hover:underline" onClick={() => removeDateOff(o.date)}>
+                <button type="button" className="text-destructive hover:underline" onClick={() => removeDateOff(o.date)}>
                   Remove
                 </button>
               </li>

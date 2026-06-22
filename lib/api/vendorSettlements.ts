@@ -22,10 +22,18 @@ export interface VendorSettlementListResponse {
 }
 
 export const vendorSettlementsApi = {
-  list(params?: { limit?: number; offset?: number }) {
+  list(params?: { q?: string; status?: string; from?: string; to?: string; limit?: number; offset?: number }) {
     const q: Record<string, string | number> = {};
+    if (params?.q) q.q = params.q;
+    if (params?.status) q.status = params.status;
+    if (params?.from) q.from = params.from;
+    if (params?.to) q.to = params.to;
     if (params?.limit != null) q.limit = params.limit;
     if (params?.offset != null) q.offset = params.offset;
     return apiClient.get<VendorSettlementListResponse>(`${BASE}/me/settlements`, q);
+  },
+
+  get(settlementId: string) {
+    return apiClient.get<VendorSettlementRow>(`${BASE}/me/settlements/${encodeURIComponent(settlementId)}`);
   },
 };

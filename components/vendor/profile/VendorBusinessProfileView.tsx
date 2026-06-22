@@ -8,7 +8,6 @@ import {
   Crown,
   CreditCard,
   ImagePlus,
-  Loader2,
   Mail,
   MapPin,
   Navigation,
@@ -23,7 +22,6 @@ import { getVendorMe, patchVendorProfile, type VendorProfile } from "@/lib/api/v
 import { vendorPlanApi, type VendorPlanInfoDto } from "@/lib/api/vendorPlan";
 import { vendorOrdersApi } from "@/lib/api/vendorOrders";
 import { vendorCatalogApi } from "@/lib/api/vendorCatalog";
-import { resolveMediaUrl } from "@/lib/media";
 import {
   formatInr,
   formatPercent,
@@ -32,6 +30,7 @@ import {
   pickFirstServiceLabel,
   shopAddressFromJson,
 } from "@/lib/vendor/profileDisplay";
+import { Skeleton } from "@/components/ui/skeleton";
 
 function errMessage(e: unknown): string {
   if (e && typeof e === "object" && "message" in e) return String((e as { message: string }).message);
@@ -212,9 +211,13 @@ export default function VendorBusinessProfileView() {
 
   if (loading || !me) {
     return (
-      <div className="flex min-w-0 items-center justify-center gap-2 py-20 text-slate-600">
-        <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-        Loading profile…
+      <div className="min-w-0 space-y-4 py-6">
+        <Skeleton className="h-48 rounded-2xl" />
+        <Skeleton className="h-32 rounded-2xl" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Skeleton className="h-28 rounded-2xl" />
+          <Skeleton className="h-28 rounded-2xl" />
+        </div>
       </div>
     );
   }
@@ -235,10 +238,8 @@ export default function VendorBusinessProfileView() {
 
   const verified = String(me.kycStatus || "").toLowerCase() === "verified";
 
-  const thumb = resolveMediaUrl(
-    (me as { thumbnailUrl?: string | null }).thumbnailUrl || (me as { logoUrl?: string | null }).logoUrl || "",
-  ) || "";
-  const bannerUrl = resolveMediaUrl((me as { bannerUrl?: string | null }).bannerUrl || "") || "";
+  const thumb = String((me as { thumbnailUrl?: string | null }).thumbnailUrl || (me as { logoUrl?: string | null }).logoUrl || "");
+  const bannerUrl = String((me as { bannerUrl?: string | null }).bannerUrl || "");
 
   const catalogCountLabel = isProduct ? "Products" : "Services";
   let catalogCount = 0;
@@ -249,17 +250,17 @@ export default function VendorBusinessProfileView() {
   return (
     <div className="min-w-0 space-y-6">
       {readOnly ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+        <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-foreground">
           Profile is pending approval. Details below reflect your application.{" "}
-          <Link href="/onboarding" className="font-semibold text-[#0f766e] underline">
+          <Link href="/onboarding" className="font-semibold text-primary underline">
             Edit application
           </Link>
         </div>
       ) : null}
-      {banner ? <p className="text-sm text-red-600">{banner}</p> : null}
+      {banner ? <p className="text-sm text-destructive">{banner}</p> : null}
 
       {/* Cover */}
-      <div className="relative overflow-hidden rounded-[14px] border border-slate-100 bg-gradient-to-br from-[#20a090]/35 via-[#20a090]/15 to-slate-100 shadow-[0_2px_12px_rgba(15,23,42,0.06)]">
+      <div className="relative overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-primary/35 via-primary/15 to-muted ">
         <div className="relative h-44 w-full sm:h-52">
           {bannerUrl ? (
             <Image src={bannerUrl} alt="" fill className="object-cover" sizes="100vw" unoptimized />
@@ -273,17 +274,17 @@ export default function VendorBusinessProfileView() {
             setCoverUrlDraft(bannerUrl);
             setCoverOpen(true);
           }}
-          className="absolute bottom-3 right-3 inline-flex items-center gap-2 rounded-xl border border-white/80 bg-white/95 px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm backdrop-blur hover:bg-white disabled:opacity-50"
+          className="absolute bottom-3 right-3 inline-flex items-center gap-2 rounded-xl border border-white/80 bg-card/95 px-3 py-2 text-sm font-semibold text-foreground shadow-sm backdrop-blur hover:bg-card disabled:opacity-50"
         >
-          <ImagePlus className="h-4 w-4 text-[#20a090]" aria-hidden />
+          <ImagePlus className="h-4 w-4 text-primary" aria-hidden />
           Change Cover
         </button>
       </div>
 
       {/* Summary card */}
-      <div className="rounded-[14px] border border-slate-100 bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.06)] sm:p-6">
+      <div className="rounded-2xl border border-border bg-card p-5  sm:p-6">
         <div className="flex flex-wrap items-start gap-4">
-          <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-[#20a090]/15 text-[#20a090] ring-1 ring-[#20a090]/25">
+          <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-primary/15 text-primary ring-1 ring-primary/25">
             {thumb ? (
               <Image src={thumb} alt="" width={80} height={80} className="h-full w-full object-cover" unoptimized />
             ) : (
@@ -292,28 +293,28 @@ export default function VendorBusinessProfileView() {
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">{me.businessName || "—"}</h1>
+              <h1 className="text-xl font-bold text-foreground sm:text-2xl">{me.businessName || "—"}</h1>
               {verified ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-0.5 text-xs font-semibold text-success ring-1 ring-emerald-200">
                   <Check className="h-3.5 w-3.5" aria-hidden />
                   verified
                 </span>
               ) : null}
             </div>
-            <p className="mt-1 text-base text-slate-600">{subtitle}</p>
+            <p className="mt-1 text-base text-muted-foreground">{subtitle}</p>
           </div>
         </div>
       </div>
 
       {/* Business details */}
-      <section className="rounded-[14px] border border-slate-100 bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.06)] sm:p-6">
+      <section className="rounded-2xl border border-border bg-card p-5  sm:p-6">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-lg font-bold text-slate-900">Business Details</h2>
+          <h2 className="text-lg font-bold text-foreground">Business Details</h2>
           <button
             type="button"
             disabled={readOnly || saving}
             onClick={() => openEdit()}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm font-semibold text-foreground hover:bg-muted disabled:opacity-50"
           >
             <Pencil className="h-4 w-4" aria-hidden />
             Edit
@@ -321,51 +322,51 @@ export default function VendorBusinessProfileView() {
         </div>
         <ul className="mt-5 space-y-5">
           <li className="flex gap-3">
-            <Mail className="mt-0.5 h-5 w-5 shrink-0 text-slate-400" aria-hidden />
+            <Mail className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Email</p>
-              <p className="mt-0.5 text-base font-semibold text-slate-900">{me.email || "—"}</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Email</p>
+              <p className="mt-0.5 text-base font-semibold text-foreground">{me.email || "—"}</p>
             </div>
           </li>
           <li className="flex gap-3">
-            <Phone className="mt-0.5 h-5 w-5 shrink-0 text-slate-400" aria-hidden />
+            <Phone className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Phone</p>
-              <p className="mt-0.5 text-base font-semibold text-slate-900">{me.phone || "—"}</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Phone</p>
+              <p className="mt-0.5 text-base font-semibold text-foreground">{me.phone || "—"}</p>
             </div>
           </li>
           <li className="flex gap-3">
-            <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-slate-400" aria-hidden />
+            <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Location</p>
-              <p className="mt-0.5 text-base font-semibold text-slate-900">{shopAddressFromJson(me.addressJson) || "—"}</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Location</p>
+              <p className="mt-0.5 text-base font-semibold text-foreground">{shopAddressFromJson(me.addressJson) || "—"}</p>
             </div>
           </li>
           <li className="flex gap-3">
-            <Shield className="mt-0.5 h-5 w-5 shrink-0 text-slate-400" aria-hidden />
+            <Shield className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Commission Rate</p>
-              <p className="mt-0.5 text-base font-semibold text-slate-900">{commissionDisplay}</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Commission Rate</p>
+              <p className="mt-0.5 text-base font-semibold text-foreground">{commissionDisplay}</p>
             </div>
           </li>
         </ul>
       </section>
 
       {/* Plan & payment */}
-      <section className="rounded-[14px] border border-slate-100 bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.06)] sm:p-6">
-        <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
-          <Crown className="h-5 w-5 text-[#20a090]" aria-hidden />
+      <section className="rounded-2xl border border-border bg-card p-5  sm:p-6">
+        <h2 className="flex items-center gap-2 text-lg font-bold text-foreground">
+          <Crown className="h-5 w-5 text-primary" aria-hidden />
           Plan &amp; Payment
         </h2>
-        <div className="mt-4 rounded-[12px] border border-[#20a090]/25 bg-[#20a090]/10 px-4 py-4 sm:px-5 sm:py-5">
+        <div className="mt-4 rounded-[12px] border border-primary/25 bg-primary/10 px-4 py-4 sm:px-5 sm:py-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-lg font-bold text-[#0f766e]">{planName}</p>
-              <p className="mt-1 text-sm text-slate-600">{planBlurb}</p>
+              <p className="text-lg font-bold text-primary">{planName}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{planBlurb}</p>
             </div>
             <span
               className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
-                pay.paid ? "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200" : "bg-red-50 text-red-700 ring-1 ring-red-200"
+                pay.paid ? "bg-success/10 text-success ring-1 ring-emerald-200" : "bg-destructive/10 text-destructive ring-1 ring-red-200"
               }`}
             >
               <CreditCard className="h-3.5 w-3.5" aria-hidden />
@@ -376,20 +377,20 @@ export default function VendorBusinessProfileView() {
       </section>
 
       {/* Performance */}
-      <section className="rounded-[14px] border border-slate-100 bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.06)] sm:p-6">
-        <h2 className="text-lg font-bold text-slate-900">Performance</h2>
+      <section className="rounded-2xl border border-border bg-card p-5  sm:p-6">
+        <h2 className="text-lg font-bold text-foreground">Performance</h2>
         <div className="mt-5 grid gap-6 sm:grid-cols-3">
           <div>
-            <p className="text-3xl font-bold tracking-tight text-slate-900">{catalogCount}</p>
-            <p className="mt-1 text-sm font-medium text-slate-500">{catalogCountLabel}</p>
+            <p className="text-3xl font-bold tracking-tight text-foreground">{catalogCount}</p>
+            <p className="mt-1 text-sm font-medium text-muted-foreground">{catalogCountLabel}</p>
           </div>
           <div>
-            <p className="text-3xl font-bold tracking-tight text-slate-900">{orderTotal}</p>
-            <p className="mt-1 text-sm font-medium text-slate-500">Orders</p>
+            <p className="text-3xl font-bold tracking-tight text-foreground">{orderTotal}</p>
+            <p className="mt-1 text-sm font-medium text-muted-foreground">Orders</p>
           </div>
           <div>
-            <p className="text-3xl font-bold tracking-tight text-slate-900">{formatInr(revenue)}</p>
-            <p className="mt-1 text-sm font-medium text-slate-500">Revenue</p>
+            <p className="text-3xl font-bold tracking-tight text-foreground">{formatInr(revenue)}</p>
+            <p className="mt-1 text-sm font-medium text-muted-foreground">Revenue</p>
           </div>
         </div>
       </section>
@@ -402,21 +403,21 @@ export default function VendorBusinessProfileView() {
           role="presentation"
         >
           <div
-            className="max-h-[min(92vh,760px)] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl sm:p-8"
+            className="max-h-[min(92vh,760px)] w-full max-w-lg overflow-y-auto rounded-2xl bg-card p-6 shadow-2xl sm:p-8"
             role="dialog"
             aria-modal="true"
             aria-labelledby="biz-edit-title"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">
-              <h2 id="biz-edit-title" className="text-xl font-bold text-slate-900">
+              <h2 id="biz-edit-title" className="text-xl font-bold text-foreground">
                 Business Details
               </h2>
               <div className="flex shrink-0 items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setEditOpen(false)}
-                  className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                  className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-muted-foreground"
                   aria-label="Close"
                 >
                   <X className="h-5 w-5" />
@@ -425,7 +426,7 @@ export default function VendorBusinessProfileView() {
                   type="button"
                   disabled={saving}
                   onClick={() => void saveBusinessDetails()}
-                  className="inline-flex items-center gap-2 rounded-xl bg-[#20a090] px-4 py-2 text-sm font-semibold text-white hover:bg-[#188a7c] disabled:opacity-60"
+                  className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-60"
                 >
                   <Save className="h-4 w-4" aria-hidden />
                   Save
@@ -435,9 +436,9 @@ export default function VendorBusinessProfileView() {
 
             <div className="mt-6 space-y-4">
               <label className="block">
-                <span className="text-sm font-semibold text-slate-800">Email</span>
+                <span className="text-sm font-semibold text-foreground">Email</span>
                 <input
-                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-base text-slate-900 outline-none focus:border-[#20a090] focus:ring-2 focus:ring-[#20a090]/25"
+                  className="mt-2 w-full rounded-xl border border-border px-4 py-3 text-base text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
                   type="email"
                   value={form.email}
                   onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
@@ -445,35 +446,35 @@ export default function VendorBusinessProfileView() {
                 />
               </label>
               <label className="block">
-                <span className="text-sm font-semibold text-slate-800">Phone</span>
+                <span className="text-sm font-semibold text-foreground">Phone</span>
                 <input
-                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-base text-slate-900 outline-none focus:border-[#20a090] focus:ring-2 focus:ring-[#20a090]/25"
+                  className="mt-2 w-full rounded-xl border border-border px-4 py-3 text-base text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
                   value={form.phone}
                   onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
                   autoComplete="tel"
                 />
               </label>
               <label className="block">
-                <span className="text-sm font-semibold text-slate-800">Shop Address</span>
+                <span className="text-sm font-semibold text-foreground">Shop Address</span>
                 <input
-                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-base text-slate-900 outline-none focus:border-[#20a090] focus:ring-2 focus:ring-[#20a090]/25"
+                  className="mt-2 w-full rounded-xl border border-border px-4 py-3 text-base text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
                   value={form.shopAddress}
                   onChange={(e) => setForm((f) => ({ ...f, shopAddress: e.target.value }))}
                   autoComplete="street-address"
                 />
               </label>
               <div>
-                <span className="text-sm font-semibold text-slate-800">Exact Shop Coordinates (used for nearby search)</span>
+                <span className="text-sm font-semibold text-foreground">Exact Shop Coordinates (used for nearby search)</span>
                 <div className="mt-2 grid grid-cols-2 gap-3">
                   <input
-                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-base text-slate-900 outline-none focus:border-[#20a090] focus:ring-2 focus:ring-[#20a090]/25"
+                    className="w-full rounded-xl border border-border px-4 py-3 text-base text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
                     placeholder="Latitude"
                     value={form.lat}
                     onChange={(e) => setForm((f) => ({ ...f, lat: e.target.value }))}
                     inputMode="decimal"
                   />
                   <input
-                    className="w-full rounded-xl border border-slate-200 px-4 py-3 text-base text-slate-900 outline-none focus:border-[#20a090] focus:ring-2 focus:ring-[#20a090]/25"
+                    className="w-full rounded-xl border border-border px-4 py-3 text-base text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
                     placeholder="Longitude"
                     value={form.lng}
                     onChange={(e) => setForm((f) => ({ ...f, lng: e.target.value }))}
@@ -484,21 +485,21 @@ export default function VendorBusinessProfileView() {
                   <button
                     type="button"
                     onClick={() => useCurrentLocation()}
-                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground hover:bg-muted"
                   >
-                    <Navigation className="h-4 w-4 text-[#20a090]" aria-hidden />
+                    <Navigation className="h-4 w-4 text-primary" aria-hidden />
                     Use Current Location
                   </button>
                   <button
                     type="button"
                     onClick={() => openPickOnMap()}
-                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                    className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground hover:bg-muted"
                   >
-                    <MapPin className="h-4 w-4 text-[#20a090]" aria-hidden />
+                    <MapPin className="h-4 w-4 text-primary" aria-hidden />
                     Pick on Map
                   </button>
                 </div>
-                <p className="mt-3 text-xs text-slate-500">
+                <p className="mt-3 text-xs text-muted-foreground">
                   Tip: Open Google Maps, long-press your shop, and copy the lat,lng into the fields above.
                 </p>
               </div>
@@ -514,18 +515,18 @@ export default function VendorBusinessProfileView() {
           role="presentation"
         >
           <div
-            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+            className="w-full max-w-md rounded-2xl bg-card p-6 shadow-2xl"
             role="dialog"
             aria-modal="true"
             aria-labelledby="cover-title"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 id="cover-title" className="text-lg font-bold text-slate-900">
+            <h2 id="cover-title" className="text-lg font-bold text-foreground">
               Cover image URL
             </h2>
-            <p className="mt-1 text-sm text-slate-500">Paste a direct link to an image (HTTPS).</p>
+            <p className="mt-1 text-sm text-muted-foreground">Paste a direct link to an image (HTTPS).</p>
             <input
-              className="mt-4 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none focus:border-[#20a090] focus:ring-2 focus:ring-[#20a090]/25"
+              className="mt-4 w-full rounded-xl border border-border px-4 py-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
               value={coverUrlDraft}
               onChange={(e) => setCoverUrlDraft(e.target.value)}
               placeholder="https://…"
@@ -534,7 +535,7 @@ export default function VendorBusinessProfileView() {
               <button
                 type="button"
                 onClick={() => setCoverOpen(false)}
-                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                className="rounded-xl border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted"
               >
                 Cancel
               </button>
@@ -542,7 +543,7 @@ export default function VendorBusinessProfileView() {
                 type="button"
                 disabled={saving}
                 onClick={() => void saveCoverUrl()}
-                className="rounded-xl bg-[#20a090] px-4 py-2 text-sm font-semibold text-white hover:bg-[#188a7c] disabled:opacity-60"
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-60"
               >
                 Save
               </button>

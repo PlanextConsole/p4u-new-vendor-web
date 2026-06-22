@@ -11,7 +11,6 @@ import {
   type TaxConfigurationRow,
 } from "@/lib/api/vendorCatalog";
 import { vendorUploadImage } from "@/lib/api/vendorUpload";
-import { resolveMediaUrl } from "@/lib/media";
 
 function parseMeta(v: unknown): Record<string, unknown> {
   if (!v || typeof v !== "object" || Array.isArray(v)) return {};
@@ -53,6 +52,14 @@ function splitLabelAndHex(value: string) {
   if (!m) return { label: s, hex: null as string | null };
   const label = String(m[1] || "").trim();
   return { label: label || s, hex: m[2] };
+}
+
+function resolvePublicAssetUrl(u: string) {
+  if (!u) return "";
+  if (/^https?:\/\//i.test(u)) return u;
+  const base = (process.env.NEXT_PUBLIC_API_GATEWAY_URL || "").replace(/\/$/, "");
+  if (base) return `${base}${u.startsWith("/") ? u : `/${u}`}`;
+  return u;
 }
 
 type TabKey = "general" | "pricing" | "attributes";
@@ -465,7 +472,7 @@ export function VendorProductForm({
             {thumbnailUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={resolveMediaUrl(thumbnailUrl) || ""}
+                src={resolvePublicAssetUrl(thumbnailUrl)}
                 alt=""
                 className="mt-2 h-24 w-24 rounded-lg border border-slate-200 object-cover"
               />

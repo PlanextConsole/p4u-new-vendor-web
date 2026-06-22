@@ -5,7 +5,6 @@ import {
   CreditCard,
   DollarSign,
   History,
-  Loader2,
   Package,
   ShieldCheck,
   ShoppingCart,
@@ -18,8 +17,10 @@ import {
   VendorStatRow,
   type StatItem,
 } from "@/components/vendor/VendorDashboardUi";
+import { Skeleton } from "@/components/ui/skeleton";
 import { vendorOrdersApi } from "@/lib/api/vendorOrders";
 import { vendorCatalogApi } from "@/lib/api/vendorCatalog";
+import { vendorRatingsApi } from "@/lib/api/vendorRatings";
 import { formatInr } from "@/lib/vendor/settlementDisplay";
 import {
   buildWeekRevenueSeries,
@@ -36,18 +37,21 @@ export default function ProductVendorDashboardPage() {
   const [err, setErr] = useState("");
   const [orderTotal, setOrderTotal] = useState(0);
   const [productTotal, setProductTotal] = useState(0);
+  const [ratingSummary, setRatingSummary] = useState<{ averageRating: number; reviewCount: number } | null>(null);
   const [orders, setOrders] = useState<Awaited<ReturnType<typeof vendorOrdersApi.list>>["items"]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setErr("");
     try {
-      const [ordersRes, productsRes] = await Promise.all([
+      const [ordersRes, productsRes, ratingsRes] = await Promise.all([
         vendorOrdersApi.list({ limit: 100, offset: 0 }),
         vendorCatalogApi.listProducts({ limit: 1, offset: 0, moderation: "all" }),
+        vendorRatingsApi.getSummary().catch(() => null),
       ]);
       setOrderTotal(ordersRes.total ?? ordersRes.items?.length ?? 0);
       setProductTotal(productsRes.total ?? 0);
+      setRatingSummary(ratingsRes);
       setOrders(ordersRes.items || []);
     } catch (e: unknown) {
       setErr(e && typeof e === "object" && "message" in e ? String((e as { message: string }).message) : "Failed to load dashboard");
@@ -95,20 +99,30 @@ export default function ProductVendorDashboardPage() {
       },
       {
         title: "Store rating",
-        value: "—",
-        hint: "Ratings are not available yet",
+        value: ratingSummary && ratingSummary.reviewCount > 0 ? String(ratingSummary.averageRating) : "—",
+        hint:
+          ratingSummary && ratingSummary.reviewCount > 0
+            ? `${ratingSummary.reviewCount} review${ratingSummary.reviewCount === 1 ? "" : "s"}`
+            : "No ratings yet",
         icon: Star,
       },
     ];
-  }, [orders, orderTotal, productTotal]);
+  }, [orders, orderTotal, productTotal, ratingSummary]);
 
   const recentRows = useMemo(() => orders.slice(0, 5).map(orderToRecentRow), [orders]);
 
   if (loading) {
     return (
-      <div className="flex min-h-[240px] items-center justify-center gap-2 text-slate-500">
-        <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-        Loading dashboard…
+      <div className="min-w-0 space-y-6">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-28 rounded-2xl" />
+          ))}
+        </div>
+        <div className="grid gap-4 lg:grid-cols-5">
+          <Skeleton className="h-[300px] rounded-2xl lg:col-span-3" />
+          <Skeleton className="h-[300px] rounded-2xl lg:col-span-2" />
+        </div>
       </div>
     );
   }
@@ -116,7 +130,7 @@ export default function ProductVendorDashboardPage() {
   return (
     <div className="min-w-0 space-y-8">
       {err ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">
+        <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-foreground" role="status">
           {err}
         </div>
       ) : null}

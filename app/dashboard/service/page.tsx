@@ -7,7 +7,6 @@ import {
   CreditCard,
   DollarSign,
   History,
-  Loader2,
   ShoppingCart,
   Star,
   Wrench,
@@ -19,8 +18,10 @@ import {
   VendorStatRow,
   type StatItem,
 } from "@/components/vendor/VendorDashboardUi";
+import { Skeleton } from "@/components/ui/skeleton";
 import { vendorBookingsApi, type VendorBookingRow } from "@/lib/api/vendorBookings";
 import { vendorOfferedServicesApi } from "@/lib/api/vendorOfferedServices";
+import { vendorRatingsApi } from "@/lib/api/vendorRatings";
 import { formatInr } from "@/lib/vendor/settlementDisplay";
 import {
   bookingAmount,
@@ -36,21 +37,24 @@ export default function ServiceVendorDashboardPage() {
   const [bookingRecordTotal, setBookingRecordTotal] = useState(0);
   const [pendingTotal, setPendingTotal] = useState(0);
   const [serviceOfferingCount, setServiceOfferingCount] = useState(0);
+  const [ratingSummary, setRatingSummary] = useState<{ averageRating: number; reviewCount: number } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setErr("");
     try {
-      const [listRes, pendRes, offerings] = await Promise.all([
+      const [listRes, pendRes, offerings, ratingsRes] = await Promise.all([
         vendorBookingsApi.list({ limit: 100, offset: 0 }),
         vendorBookingsApi.list({ status: "pending", limit: 1, offset: 0 }),
         vendorOfferedServicesApi.listOfferings().catch(() => []),
+        vendorRatingsApi.getSummary().catch(() => null),
       ]);
       setBookings(listRes.items || []);
       setBookingRecordTotal(listRes.total ?? listRes.items?.length ?? 0);
       setPendingTotal(pendRes.total ?? 0);
       const activeOffers = offerings.filter((o) => o.isActive !== false);
       setServiceOfferingCount(activeOffers.length);
+      setRatingSummary(ratingsRes);
     } catch (e: unknown) {
       setErr(e && typeof e === "object" && "message" in e ? String((e as { message: string }).message) : "Failed to load dashboard");
       setBookings([]);
@@ -103,12 +107,15 @@ export default function ServiceVendorDashboardPage() {
       },
       {
         title: "Service rating",
-        value: "—",
-        hint: "Ratings are not available yet",
+        value: ratingSummary && ratingSummary.reviewCount > 0 ? String(ratingSummary.averageRating) : "—",
+        hint:
+          ratingSummary && ratingSummary.reviewCount > 0
+            ? `${ratingSummary.reviewCount} review${ratingSummary.reviewCount === 1 ? "" : "s"}`
+            : "No ratings yet",
         icon: Star,
       },
     ];
-  }, [sortedBookings, bookingRecordTotal, pendingTotal, serviceOfferingCount]);
+  }, [sortedBookings, bookingRecordTotal, pendingTotal, serviceOfferingCount, ratingSummary]);
 
   const recentRows = useMemo(
     () => sortedBookings.slice(0, 5).map(bookingToRecentRow),
@@ -117,9 +124,16 @@ export default function ServiceVendorDashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[240px] items-center justify-center gap-2 text-slate-500">
-        <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-        Loading dashboard…
+      <div className="min-w-0 space-y-6">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-28 rounded-2xl" />
+          ))}
+        </div>
+        <div className="grid gap-4 lg:grid-cols-5">
+          <Skeleton className="h-[300px] rounded-2xl lg:col-span-3" />
+          <Skeleton className="h-[300px] rounded-2xl lg:col-span-2" />
+        </div>
       </div>
     );
   }
@@ -127,7 +141,7 @@ export default function ServiceVendorDashboardPage() {
   return (
     <div className="min-w-0 space-y-8">
       {err ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">
+        <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-foreground" role="status">
           {err}
         </div>
       ) : null}

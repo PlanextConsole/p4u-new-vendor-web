@@ -5,16 +5,19 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { ConfirmationResult } from "firebase/auth";
-import {
-  ArrowRight,
-  CheckCircle2,
-  ChevronDown,
-  Phone,
-  Store,
-} from "lucide-react";
+import { ArrowRight, CheckCircle2, ChevronDown, Loader2, Phone, Store } from "lucide-react";
 import { authApi } from "@/lib/api/auth";
-import { persistAuthSession, hasAccessToken } from "@/lib/authSession";
+import { persistAuthSession } from "@/lib/authSession";
 import { sendPhoneOtp, clearRecaptcha } from "@/lib/firebase";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card } from "@/components/ui/card";
+import {
+  AuthPageBackground,
+  AuthCardHeader,
+  OtpInputRow,
+} from "@/components/auth/auth-ui";
+import { cn } from "@/lib/utils";
 
 const RECAPTCHA_ID = "p4u-vendor-recaptcha";
 const OTP_LEN = 6;
@@ -39,7 +42,6 @@ function maskPhone(p: string) {
   return `+91-${d.slice(0, 3)}***${d.slice(-3)}`;
 }
 
-/** After Firebase accepts the OTP, server-side exchange can still fail (Keycloak, env). */
 function formatPhoneExchangeError(err: unknown): string {
   const e = err as { status?: number; message?: string };
   const msg = String(e.message || "").trim();
@@ -85,12 +87,6 @@ export default function VendorLoginCard() {
   const submitLock = useRef(false);
 
   useEffect(() => {
-    if (hasAccessToken()) {
-      router.replace("/dashboard/product");
-    }
-  }, [router]);
-
-  useEffect(() => {
     if (searchParams?.get("registered") === "1") {
       setRegisteredFlash(true);
       const t = setTimeout(() => setRegisteredFlash(false), 8000);
@@ -99,11 +95,7 @@ export default function VendorLoginCard() {
   }, [searchParams]);
 
   useEffect(() => {
-    return () => {
-      // Tear down the verifier when the component unmounts so re-renders
-      // don't collide on the same DOM node.
-      clearRecaptcha();
-    };
+    return () => clearRecaptcha();
   }, []);
 
   useEffect(() => {
@@ -137,13 +129,9 @@ export default function VendorLoginCard() {
       } else if (code.includes("invalid-phone-number")) {
         setError("Invalid phone number for OTP delivery.");
       } else if (code.includes("operation-not-allowed")) {
-        setError(
-          "Phone sign-in is not enabled in Firebase. Ask the admin to enable it.",
-        );
+        setError("Phone sign-in is not enabled in Firebase. Ask the admin to enable it.");
       } else {
-        setError(
-          (err as { message?: string })?.message || "Failed to send OTP. Please retry.",
-        );
+        setError((err as { message?: string })?.message || "Failed to send OTP. Please retry.");
       }
     } finally {
       submitLock.current = false;
@@ -170,13 +158,8 @@ export default function VendorLoginCard() {
       if (res.loggedIn) {
         persistAuthSession(res.auth, toE164(phone));
         setInfo("Login successful! Redirecting…");
-        setTimeout(() => {
-          router.replace("/dashboard/product");
-        }, 280);
+        setTimeout(() => router.replace("/dashboard/product"), 280);
       } else if (res.registrationToken) {
-        // No vendor account found for this phone. Park the verified Firebase
-        // session details for /register to use at submit time and route the
-        // user there with a friendly message.
         sessionStorage.setItem("p4u_vendor_register_phone", toE164(phone));
         setError("No vendor account found for this phone. Redirecting you to registration…");
         setTimeout(() => router.push("/register"), 900);
@@ -262,194 +245,170 @@ export default function VendorLoginCard() {
   const ss = String(timer % 60).padStart(2, "0");
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f5f5f0] px-4 py-10">
-      <div className="w-full max-w-[440px] overflow-hidden rounded-2xl bg-white shadow-[0_8px_40px_rgba(15,23,42,0.08)] ring-1 ring-black/[0.04]">
-        <div className="bg-vendor-teal px-8 pb-9 pt-10 text-center text-white">
-          <div className="mx-auto mb-5 flex h-[76px] w-[76px] items-center justify-center rounded-2xl bg-white p-2 shadow-md ring-1 ring-white/20">
-            <Image
-              src="/logo.png"
-              alt="P4U"
-              width={56}
-              height={56}
-              className="h-14 w-14 object-contain"
-              priority
+    <AuthPageBackground>
+      <div className="flex flex-1 items-center justify-center px-4 py-10">
+        <div className="w-full max-w-md">
+          <Card className="overflow-hidden border-border/50 shadow-2xl">
+            <AuthCardHeader
+              title="Vendor Portal"
+              subtitle="Manage your store, orders & settlements"
             />
-          </div>
-          <div className="flex items-center justify-center gap-2.5">
-            <Store className="h-6 w-6 shrink-0 opacity-95" strokeWidth={2} aria-hidden />
-            <h1 className="text-[1.35rem] font-bold tracking-tight">Vendor Portal</h1>
-          </div>
-          <p className="mt-2.5 text-sm font-normal leading-relaxed text-white/90">
-            Manage your store, orders & settlements
-          </p>
-        </div>
 
-        {registeredFlash ? (
-          <div className="flex items-start gap-3 border-b border-emerald-100 bg-emerald-50 px-7 py-4 text-sm text-emerald-900">
-            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" aria-hidden />
-            <div>
-              <p className="font-semibold">Registration submitted</p>
-              <p className="mt-0.5 text-xs text-emerald-800/80">
-                Operations will review your application. You can sign in once your
-                vendor account is approved.
+            {registeredFlash ? (
+              <div className="flex items-start gap-3 border-b border-success/20 bg-success/10 px-6 py-4 text-sm text-success">
+                <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
+                <div>
+                  <p className="font-semibold">Registration submitted</p>
+                  <p className="mt-0.5 text-xs opacity-90">
+                    Operations will review your application. You can sign in once your vendor account is approved.
+                  </p>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="space-y-5 p-6">
+              <div className="flex items-center justify-center gap-2 text-primary">
+                <Store className="h-4 w-4" />
+                <span className="text-xs font-semibold uppercase tracking-wide">Phone OTP sign-in</span>
+              </div>
+
+              {step === "phone" ? (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void sendOtp();
+                  }}
+                  className="space-y-4"
+                >
+                  <div>
+                    <h2 className="text-sm font-semibold text-foreground">Sign in with your mobile</h2>
+                    <p className="mt-0.5 text-xs text-muted-foreground">We&apos;ll send a 6-digit OTP to your phone.</p>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <div className="relative shrink-0">
+                      <select
+                        className="flex h-11 w-[88px] cursor-pointer appearance-none rounded-xl border border-input bg-background px-2 pr-7 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring"
+                        defaultValue="+91"
+                        aria-label="Country code"
+                      >
+                        <option value="+91">+91</option>
+                      </select>
+                      <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    </div>
+                    <div className="relative flex-1">
+                      <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        type="tel"
+                        inputMode="numeric"
+                        autoComplete="tel"
+                        placeholder="10-digit mobile number"
+                        maxLength={10}
+                        value={phone}
+                        onChange={(e) => {
+                          setPhone(e.target.value.replace(/\D/g, "").slice(0, 10));
+                          if (error) setError("");
+                        }}
+                        className="h-11 pl-10"
+                      />
+                    </div>
+                  </div>
+
+                  {error ? <p className="text-sm text-destructive">{error}</p> : null}
+
+                  <Button type="submit" className="h-12 w-full gap-2 text-base" disabled={loading}>
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" /> Sending OTP…
+                      </>
+                    ) : (
+                      <>
+                        Send OTP <ArrowRight className="h-4 w-4" />
+                      </>
+                    )}
+                  </Button>
+
+                  <p className="text-center text-xs text-muted-foreground">
+                    By continuing you agree to our Terms of Service and Privacy Policy.
+                  </p>
+
+                  <div id={RECAPTCHA_ID} />
+                </form>
+              ) : (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void verifyOtp();
+                  }}
+                  className="space-y-4"
+                >
+                  <div className="text-center">
+                    <h2 className="text-sm font-semibold text-foreground">OTP verification</h2>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Enter the code sent to{" "}
+                      <span className="font-semibold text-foreground">{maskPhone(phone)}</span>
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-foreground">{timer > 0 ? `${mm}:${ss}` : "00:00"}</p>
+                  </div>
+
+                  <OtpInputRow
+                    otp={otp}
+                    otpLen={OTP_LEN}
+                    otpRefs={otpRefs}
+                    error={Boolean(error)}
+                    onChange={changeOtp}
+                    onKeyDown={keyDownOtp}
+                    onPaste={pasteOtp}
+                  />
+
+                  {error ? <p className="text-center text-sm text-destructive">{error}</p> : null}
+                  {info ? <p className="text-center text-xs text-success">{info}</p> : null}
+
+                  <Button
+                    type="submit"
+                    className="h-12 w-full gap-2 text-base"
+                    disabled={loading || otp.some((d) => d === "")}
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" /> Verifying…
+                      </>
+                    ) : (
+                      <>
+                        Verify & Sign in <ArrowRight className="h-4 w-4" />
+                      </>
+                    )}
+                  </Button>
+
+                  <div className="flex items-center justify-between text-xs">
+                    <button type="button" onClick={changePhone} className="text-muted-foreground hover:text-foreground hover:underline">
+                      ← Change phone number
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void resend()}
+                      disabled={timer > 0 || loading}
+                      className={cn(
+                        "font-semibold text-primary hover:underline",
+                        (timer > 0 || loading) && "cursor-not-allowed opacity-50",
+                      )}
+                    >
+                      {timer > 0 ? `Resend OTP in ${timer}s` : "Resend OTP"}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              <p className="border-t border-border/40 pt-4 text-center text-sm text-muted-foreground">
+                New vendor?{" "}
+                <Link href="/register" className="font-semibold text-primary hover:underline">
+                  Register here
+                </Link>
               </p>
             </div>
-          </div>
-        ) : null}
-
-        <div className="bg-white px-7 pb-8 pt-7">
-          {step === "phone" ? (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void sendOtp();
-              }}
-              className="space-y-5"
-            >
-              <div>
-                <h2 className="text-[15px] font-semibold text-slate-900">
-                  Sign in with your mobile
-                </h2>
-                <p className="mt-0.5 text-xs text-slate-500">
-                  We&apos;ll send a 6-digit OTP to your phone.
-                </p>
-              </div>
-
-              <div className="flex gap-2">
-                <div className="relative shrink-0">
-                  <select
-                    className="input h-[48px] cursor-pointer appearance-none pr-8 text-sm font-medium text-slate-800"
-                    defaultValue="+91"
-                    aria-label="Country code"
-                  >
-                    <option value="+91">IN +91</option>
-                  </select>
-                  <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                </div>
-                <div className="relative flex-1">
-                  <Phone className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400" />
-                  <input
-                    type="tel"
-                    inputMode="numeric"
-                    autoComplete="tel"
-                    placeholder="10-digit mobile number"
-                    maxLength={10}
-                    value={phone}
-                    onChange={(e) => {
-                      setPhone(e.target.value.replace(/\D/g, "").slice(0, 10));
-                      if (error) setError("");
-                    }}
-                    className="input input-with-icon h-[48px] py-3 pl-10"
-                  />
-                </div>
-              </div>
-
-              {error ? <p className="text-sm text-red-600">{error}</p> : null}
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-vendor-teal-soft to-vendor-teal text-[15px] font-semibold text-white shadow-md transition hover:brightness-95 disabled:opacity-60 active:scale-[0.99]"
-              >
-                {loading ? "Sending OTP…" : "Send OTP"}
-                <ArrowRight className="h-5 w-5" strokeWidth={2.5} aria-hidden />
-              </button>
-
-              <p className="text-center text-xs text-slate-500">
-                By continuing you agree to our Terms of Service and Privacy Policy.
-              </p>
-
-              <div id={RECAPTCHA_ID} />
-            </form>
-          ) : (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void verifyOtp();
-              }}
-              className="space-y-5"
-            >
-              <div className="text-center">
-                <h2 className="text-[15px] font-semibold text-slate-900">
-                  OTP Verification
-                </h2>
-                <p className="mt-0.5 text-xs text-slate-500">
-                  Enter the 6-digit code sent to{" "}
-                  <span className="font-semibold text-slate-700">{maskPhone(phone)}</span>
-                </p>
-                <p className="mt-3 text-sm font-semibold text-slate-700">
-                  {timer > 0 ? `${mm}:${ss}` : "00:00"}
-                </p>
-              </div>
-
-              <div className="flex justify-center gap-2" onPaste={pasteOtp}>
-                {otp.map((digit, i) => (
-                  <input
-                    key={i}
-                    ref={(el) => {
-                      otpRefs.current[i] = el;
-                    }}
-                    type="tel"
-                    inputMode="numeric"
-                    maxLength={1}
-                    value={digit}
-                    onChange={(e) => changeOtp(i, e.target.value)}
-                    onKeyDown={(e) => keyDownOtp(i, e)}
-                    className={`h-12 w-10 rounded-lg border-[1.5px] text-center text-base font-semibold text-slate-900 outline-none transition ${
-                      digit
-                        ? "border-vendor-teal shadow-[0_0_0_3px_rgba(13,148,136,0.08)]"
-                        : error
-                          ? "border-red-400"
-                          : "border-slate-200"
-                    }`}
-                  />
-                ))}
-              </div>
-
-              {error ? (
-                <p className="text-center text-sm text-red-600">{error}</p>
-              ) : null}
-              {info ? (
-                <p className="text-center text-xs text-emerald-700">{info}</p>
-              ) : null}
-
-              <button
-                type="submit"
-                disabled={loading || otp.some((d) => d === "")}
-                className="flex h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-b from-vendor-teal-soft to-vendor-teal text-[15px] font-semibold text-white shadow-md transition hover:brightness-95 disabled:opacity-60 active:scale-[0.99]"
-              >
-                {loading ? "Verifying…" : "Verify & Sign in"}
-                <ArrowRight className="h-5 w-5" strokeWidth={2.5} aria-hidden />
-              </button>
-
-              <div className="flex items-center justify-between text-xs">
-                <button
-                  type="button"
-                  onClick={changePhone}
-                  className="text-slate-500 underline-offset-2 hover:underline"
-                >
-                  ← Change phone number
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void resend()}
-                  disabled={timer > 0 || loading}
-                  className="font-semibold text-vendor-teal disabled:cursor-not-allowed disabled:opacity-50 hover:underline"
-                >
-                  {timer > 0 ? `Resend OTP in ${timer}s` : "Resend OTP"}
-                </button>
-              </div>
-            </form>
-          )}
-
-          <p className="mt-7 text-center text-sm text-slate-600">
-            New vendor?{" "}
-            <Link href="/register" className="font-semibold text-vendor-teal hover:underline">
-              Register here
-            </Link>
-          </p>
+          </Card>
         </div>
       </div>
-    </div>
+    </AuthPageBackground>
   );
 }

@@ -51,6 +51,8 @@ export interface CatalogProductRow {
   metadata: Record<string, unknown> | null;
   createdAt?: string;
   updatedAt?: string;
+  /** Units sold (from completed orders); present on list responses. */
+  unitsSold?: number;
 }
 
 export interface ProductListResponse {

@@ -4,10 +4,26 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { ConfirmationResult } from "firebase/auth";
-import { ArrowLeft, ArrowRight, Store, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, Store } from "lucide-react";
 import { authApi } from "@/lib/api/auth";
 import { clearAuthSession, persistAuthSession } from "@/lib/authSession";
 import { clearRecaptcha, sendPhoneOtp, signOutVendorFirebase } from "@/lib/firebase";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  AuthPageBackground,
+  FormField,
+  OtpInputRow,
+  ReviewRow,
+  WizardStepBar,
+} from "@/components/auth/auth-ui";
 
 const STEPS = ["Details", "KYC & Documents", "Bank", "Review"] as const;
 
@@ -350,76 +366,58 @@ export default function RegisterPage() {
   const ss = String(timer % 60).padStart(2, "0");
 
   return (
-    <div className="min-h-screen bg-[#f5f6f4] pb-12 pt-8">
-      <div className="mx-auto max-w-3xl px-4">
+    <AuthPageBackground>
+      <div className="mx-auto max-w-3xl px-4 pb-12 pt-8">
         <header className="mb-8 flex items-center gap-3">
-          <Link href="/" className="rounded-lg p-2 hover:bg-white">
-            <ArrowLeft className="h-5 w-5 text-slate-600" />
+          <Link href="/" className="rounded-xl p-2 hover:bg-card/80">
+            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Link>
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-vendor-teal text-white">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-md">
             <Store className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-lg font-semibold text-slate-900">Vendor Registration</h1>
-            <p className="text-sm text-slate-500">
+            <h1 className="text-lg font-bold text-foreground">Vendor Registration</h1>
+            <p className="text-sm text-muted-foreground">
               {vendorKind === "SERVICE" ? "Service vendor" : "Product vendor"}
             </p>
           </div>
         </header>
 
-        <div className="mb-8 flex flex-wrap gap-2 border-b border-slate-200 pb-4">
-          {STEPS.map((label, i) => (
-            <button
-              key={label}
-              type="button"
-              onClick={() => i <= step && setStep(i)}
-              className={`rounded-full px-3 py-1 text-sm font-medium transition ${
-                i === step
-                  ? "bg-vendor-teal text-white"
-                  : i < step
-                    ? "bg-teal-50 text-vendor-teal-dark"
-                    : "bg-slate-100 text-slate-500"
-              }`}
-            >
-              {i + 1}. {label}
-            </button>
-          ))}
-        </div>
+        <WizardStepBar step={step} onStepClick={(i) => i <= step && setStep(i)} />
 
-        <div className="rounded-2xl bg-white p-8 shadow-card">
+        <Card className="border-border/50 p-6 shadow-elevated sm:p-8">
           {step === 0 && (
             <section className="space-y-5">
-              <h2 className="text-lg font-semibold text-slate-900">Details</h2>
-              <p className="text-sm text-slate-600">
+              <h2 className="text-lg font-semibold text-foreground">Details</h2>
+              <p className="text-sm text-muted-foreground">
                 Sign-in is via mobile OTP — no username or password to remember. We
                 will verify your phone at the end of this form.
               </p>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Owner Name *">
-                  <input
-                    className="input"
+                <FormField label="Owner Name *">
+                  <Input
                     value={details.ownerName}
                     onChange={(e) => setDetails({ ...details, ownerName: e.target.value })}
                   />
-                </Field>
-                <Field label="Business Name *">
+                </FormField>
+                <FormField label="Business Name *">
                   <input
-                    className="input"
+                    className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                     value={details.businessName}
                     onChange={(e) => setDetails({ ...details, businessName: e.target.value })}
                   />
-                </Field>
-                <Field label="Email">
+                </FormField>
+                <FormField label="Email">
                   <input
                     type="email"
-                    className="input"
+                    className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                     value={details.email}
                     onChange={(e) => setDetails({ ...details, email: e.target.value })}
                   />
-                </Field>
-                <Field label="Mobile (10 digits) *">
+                </FormField>
+                <FormField label="Mobile (10 digits) *">
                   <input
-                    className="input"
+                    className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                     inputMode="numeric"
                     maxLength={10}
                     placeholder="9876543210"
@@ -431,39 +429,39 @@ export default function RegisterPage() {
                       })
                     }
                   />
-                </Field>
-                <Field label="Vendor Type *">
+                </FormField>
+                <FormField label="Vendor Type *">
                   <select
-                    className="input"
+                    className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                     value={vendorKind}
                     onChange={(e) => setVendorKind(e.target.value as VendorKindChoice)}
                   >
                     <option value="PRODUCT">Product Vendor</option>
                     <option value="SERVICE">Service Vendor</option>
                   </select>
-                </Field>
+                </FormField>
                 {vendorKind === "PRODUCT" ? (
-                  <Field label="Vendor Category">
+                  <FormField label="Vendor Category">
                     <input
-                      className="input"
+                      className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                       placeholder="e.g. groceries, electronics"
                       value={details.categorySlug}
                       onChange={(e) =>
                         setDetails({ ...details, categorySlug: e.target.value })
                       }
                     />
-                  </Field>
+                  </FormField>
                 ) : (
-                  <Field label="Services">
+                  <FormField label="Services">
                     <input
-                      className="input"
+                      className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                       placeholder="e.g. salon, plumbing"
                       value={details.serviceName}
                       onChange={(e) =>
                         setDetails({ ...details, serviceName: e.target.value })
                       }
                     />
-                  </Field>
+                  </FormField>
                 )}
               </div>
 
@@ -478,43 +476,43 @@ export default function RegisterPage() {
                   These details appear on customer tax invoice issued under vendor name.
                 </p>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="GSTIN (15 chars)">
+                  <FormField label="GSTIN (15 chars)">
                     <input
-                      className="input"
+                      className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                       maxLength={15}
                       value={details.gst}
                       onChange={(e) => setDetails({ ...details, gst: e.target.value })}
                     />
-                  </Field>
-                  <Field label="PAN (10 chars)">
+                  </FormField>
+                  <FormField label="PAN (10 chars)">
                     <input
-                      className="input"
+                      className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                       maxLength={10}
                       value={details.pan}
                       onChange={(e) => setDetails({ ...details, pan: e.target.value })}
                     />
-                  </Field>
-                  <Field label="State Name (place of supply)">
+                  </FormField>
+                  <FormField label="State Name (place of supply)">
                     <input
-                      className="input"
+                      className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                       value={details.stateName}
                       onChange={(e) => setDetails({ ...details, stateName: e.target.value })}
                     />
-                  </Field>
-                  <Field label="State Code (2 digits)">
+                  </FormField>
+                  <FormField label="State Code (2 digits)">
                     <input
-                      className="input"
+                      className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                       maxLength={2}
                       value={details.stateCode}
                       onChange={(e) => setDetails({ ...details, stateCode: e.target.value })}
                     />
-                  </Field>
-                  <Field
+                  </FormField>
+                  <FormField
                     label="Registered Shop Address (printed on invoice)"
                     className="sm:col-span-2"
                   >
                     <input
-                      className="input"
+                      className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                       value={details.registeredShopAddress}
                       onChange={(e) =>
                         setDetails({
@@ -523,7 +521,7 @@ export default function RegisterPage() {
                         })
                       }
                     />
-                  </Field>
+                  </FormField>
                 </div>
               </div>
             </section>
@@ -537,11 +535,11 @@ export default function RegisterPage() {
                 application for admin verification.
               </p>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="GST Certificate">
+                <FormField label="GST Certificate">
                   <input
                     type="file"
                     accept="image/*,.pdf"
-                    className="input"
+                    className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                     onChange={(e) =>
                       setKyc((p) => ({
                         ...p,
@@ -554,12 +552,12 @@ export default function RegisterPage() {
                       Selected: {kyc.gstCertName}
                     </span>
                   ) : null}
-                </Field>
-                <Field label="PAN Card">
+                </FormField>
+                <FormField label="PAN Card">
                   <input
                     type="file"
                     accept="image/*,.pdf"
-                    className="input"
+                    className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                     onChange={(e) =>
                       setKyc((p) => ({
                         ...p,
@@ -572,7 +570,7 @@ export default function RegisterPage() {
                       Selected: {kyc.panCardName}
                     </span>
                   ) : null}
-                </Field>
+                </FormField>
               </div>
             </section>
           )}
@@ -584,34 +582,34 @@ export default function RegisterPage() {
                 Bank account where vendor settlements will be paid out.
               </p>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Bank Name">
+                <FormField label="Bank Name">
                   <input
-                    className="input"
+                    className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                     value={bank.bankName}
                     onChange={(e) => setBank({ ...bank, bankName: e.target.value })}
                   />
-                </Field>
-                <Field label="IFSC">
+                </FormField>
+                <FormField label="IFSC">
                   <input
-                    className="input"
+                    className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                     value={bank.ifscCode}
                     onChange={(e) => setBank({ ...bank, ifscCode: e.target.value })}
                   />
-                </Field>
-                <Field label="Account Holder">
+                </FormField>
+                <FormField label="Account Holder">
                   <input
-                    className="input"
+                    className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                     value={bank.accountHolderName}
                     onChange={(e) => setBank({ ...bank, accountHolderName: e.target.value })}
                   />
-                </Field>
-                <Field label="Account Number">
+                </FormField>
+                <FormField label="Account Number">
                   <input
-                    className="input"
+                    className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                     value={bank.accountNumber}
                     onChange={(e) => setBank({ ...bank, accountNumber: e.target.value })}
                   />
-                </Field>
+                </FormField>
               </div>
             </section>
           )}
@@ -649,193 +647,101 @@ export default function RegisterPage() {
             </section>
           )}
 
-          {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
+          {error ? <p className="mt-4 text-sm text-destructive">{error}</p> : null}
 
           <div className="mt-8 flex justify-between gap-4">
-            <button
-              type="button"
-              onClick={back}
-              disabled={step === 0 || loading}
-              className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
-            >
+            <Button type="button" variant="outline" onClick={back} disabled={step === 0 || loading}>
               Back
-            </button>
+            </Button>
             {step < STEPS.length - 1 ? (
-              <button
-                type="button"
-                onClick={next}
-                disabled={loading}
-                className="inline-flex items-center gap-2 rounded-xl bg-vendor-teal px-6 py-2.5 text-sm font-medium text-white hover:bg-vendor-teal-dark disabled:opacity-60"
-              >
+              <Button type="button" onClick={next} disabled={loading} className="gap-2">
                 Next
                 <ArrowRight className="h-4 w-4" />
-              </button>
+              </Button>
             ) : (
-              <button
-                type="button"
-                onClick={() => void openOtpAndSend()}
-                disabled={loading}
-                className="rounded-xl bg-vendor-teal px-6 py-2.5 text-sm font-medium text-white hover:bg-vendor-teal-dark disabled:opacity-60"
-              >
+              <Button type="button" onClick={() => void openOtpAndSend()} disabled={loading}>
                 {loading ? "Submitting…" : "Verify phone & Submit"}
-              </button>
+              </Button>
             )}
           </div>
-        </div>
+        </Card>
       </div>
 
-      {/* OTP modal — opens when vendor clicks Submit on Review */}
-      {/*
-        reCAPTCHA container must exist in the DOM before the first OTP send.
-        If it only lived inside the modal, the first `sendOtp` ran before paint
-        and Firebase threw auth/argument-error; Retry worked after the modal rendered.
-      */}
       <div id={RECAPTCHA_ID} className="sr-only" aria-hidden="true" />
 
-      {otpOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-100 px-5 py-3">
-              <h3 className="text-sm font-semibold text-slate-900">
-                Verify your phone
-              </h3>
-              <button
-                type="button"
-                onClick={closeOtp}
-                className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                aria-label="Cancel"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
+      <Dialog open={otpOpen} onOpenChange={(open) => !open && closeOtp()}>
+        <DialogContent className="max-w-sm rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Verify your phone</DialogTitle>
+          </DialogHeader>
 
-            <div className="px-5 py-5">
-              {otpStep === "send" ? (
-                <div className="space-y-4 text-center">
-                  <p className="text-sm text-slate-600">
-                    We&apos;re sending a 6-digit OTP to{" "}
-                    <span className="font-semibold text-slate-800">
-                      {maskPhone(details.phone)}
-                    </span>
-                    .
-                  </p>
-                  {otpError ? (
-                    <p className="text-sm text-red-600">{otpError}</p>
-                  ) : (
-                    <p className="text-xs text-slate-500">
-                      {otpLoading ? "Sending…" : "Initialising…"}
-                    </p>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => void sendOtp()}
-                    disabled={otpLoading}
-                    className="rounded-xl bg-vendor-teal px-5 py-2 text-sm font-semibold text-white hover:bg-vendor-teal-dark disabled:opacity-60"
-                  >
-                    {otpLoading ? "Sending…" : "Retry"}
-                  </button>
-                </div>
+          {otpStep === "send" ? (
+            <div className="space-y-4 text-center">
+              <p className="text-sm text-muted-foreground">
+                We&apos;re sending a 6-digit OTP to{" "}
+                <span className="font-semibold text-foreground">{maskPhone(details.phone)}</span>.
+              </p>
+              {otpError ? (
+                <p className="text-sm text-destructive">{otpError}</p>
               ) : (
-                <div className="space-y-4">
-                  <p className="text-center text-sm text-slate-600">
-                    Enter the code sent to{" "}
-                    <span className="font-semibold text-slate-800">
-                      {maskPhone(details.phone)}
-                    </span>
-                  </p>
-                  <p className="text-center text-sm font-semibold text-slate-700">
-                    {timer > 0 ? `${mm}:${ss}` : "00:00"}
-                  </p>
-                  <div className="flex justify-center gap-2" onPaste={pasteOtp}>
-                    {otp.map((digit, i) => (
-                      <input
-                        key={i}
-                        ref={(el) => {
-                          otpRefs.current[i] = el;
-                        }}
-                        type="tel"
-                        inputMode="numeric"
-                        maxLength={1}
-                        value={digit}
-                        onChange={(e) => changeOtp(i, e.target.value)}
-                        onKeyDown={(e) => keyDownOtp(i, e)}
-                        className={`h-12 w-10 rounded-lg border-[1.5px] text-center text-base font-semibold text-slate-900 outline-none transition ${
-                          digit
-                            ? "border-vendor-teal shadow-[0_0_0_3px_rgba(13,148,136,0.08)]"
-                            : otpError
-                              ? "border-red-400"
-                              : "border-slate-200"
-                        }`}
-                      />
-                    ))}
-                  </div>
-
-                  {otpError ? (
-                    <p className="text-center text-sm text-red-600">{otpError}</p>
-                  ) : null}
-                  {otpInfo ? (
-                    <p className="text-center text-xs text-emerald-700">{otpInfo}</p>
-                  ) : null}
-
-                  <button
-                    type="button"
-                    onClick={() => void verifyAndSubmit()}
-                    disabled={otpLoading || otp.some((d) => d === "")}
-                    className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-vendor-teal text-sm font-semibold text-white hover:bg-vendor-teal-dark disabled:opacity-60"
-                  >
-                    {otpLoading ? "Verifying & registering…" : "Verify & Submit"}
-                  </button>
-
-                  <div className="flex items-center justify-between text-xs">
-                    <button
-                      type="button"
-                      onClick={closeOtp}
-                      className="text-slate-500 underline-offset-2 hover:underline"
-                      disabled={otpLoading}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void resend()}
-                      disabled={timer > 0 || otpLoading}
-                      className="font-semibold text-vendor-teal disabled:cursor-not-allowed disabled:opacity-50 hover:underline"
-                    >
-                      {timer > 0 ? `Resend OTP in ${timer}s` : "Resend OTP"}
-                    </button>
-                  </div>
-                </div>
+                <p className="text-xs text-muted-foreground">{otpLoading ? "Sending…" : "Initialising…"}</p>
               )}
+              <Button type="button" onClick={() => void sendOtp()} disabled={otpLoading}>
+                {otpLoading ? "Sending…" : "Retry"}
+              </Button>
             </div>
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
-}
+          ) : (
+            <div className="space-y-4">
+              <p className="text-center text-sm text-muted-foreground">
+                Enter the code sent to{" "}
+                <span className="font-semibold text-foreground">{maskPhone(details.phone)}</span>
+              </p>
+              <p className="text-center text-sm font-semibold">{timer > 0 ? `${mm}:${ss}` : "00:00"}</p>
 
-function Field({
-  label,
-  children,
-  className,
-}: {
-  label: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <label className={`block ${className ?? ""}`}>
-      <span className="mb-1.5 block text-sm font-medium text-slate-700">{label}</span>
-      {children}
-    </label>
-  );
-}
+              <OtpInputRow
+                otp={otp}
+                otpLen={OTP_LEN}
+                otpRefs={otpRefs}
+                error={Boolean(otpError)}
+                onChange={changeOtp}
+                onKeyDown={keyDownOtp}
+                onPaste={pasteOtp}
+              />
 
-function ReviewRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-wrap gap-2 border-b border-slate-100 py-2">
-      <span className="min-w-[140px] font-medium text-slate-500">{label}</span>
-      <span>{value || "—"}</span>
-    </div>
+              {otpError ? <p className="text-center text-sm text-destructive">{otpError}</p> : null}
+              {otpInfo ? <p className="text-center text-xs text-success">{otpInfo}</p> : null}
+
+              <Button
+                type="button"
+                className="h-12 w-full"
+                onClick={() => void verifyAndSubmit()}
+                disabled={otpLoading || otp.some((d) => d === "")}
+              >
+                {otpLoading ? "Verifying & registering…" : "Verify & Submit"}
+              </Button>
+
+              <div className="flex items-center justify-between text-xs">
+                <button
+                  type="button"
+                  onClick={closeOtp}
+                  className="text-muted-foreground hover:text-foreground hover:underline"
+                  disabled={otpLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void resend()}
+                  disabled={timer > 0 || otpLoading}
+                  className="font-semibold text-primary hover:underline disabled:opacity-50"
+                >
+                  {timer > 0 ? `Resend OTP in ${timer}s` : "Resend OTP"}
+                </button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </AuthPageBackground>
   );
 }

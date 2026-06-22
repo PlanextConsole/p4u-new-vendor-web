@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Clock3, DollarSign, XCircle } from "lucide-react";
 import type { VendorSettlementRow } from "@/lib/api/vendorSettlements";
 import { vendorSettlementsApi } from "@/lib/api/vendorSettlements";
+import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   displaySettlementRef,
   formatInr,
@@ -14,6 +16,7 @@ import {
   parseAmount,
   statusBadgeClass,
 } from "@/lib/vendor/settlementDisplay";
+import { cn } from "@/lib/utils";
 
 export default function VendorSettlementsView() {
   const [items, setItems] = useState<VendorSettlementRow[]>([]);
@@ -56,72 +59,56 @@ export default function VendorSettlementsView() {
     return { totalEarned, pending, settled, rejected };
   }, [items]);
 
+  const statCards = [
+    { label: "Total Earned", value: formatInr(stats.totalEarned), icon: DollarSign, iconClass: "bg-success/10 text-success", valueClass: "text-success" },
+    { label: "Pending Settlement", value: formatInr(stats.pending), icon: Clock3, iconClass: "bg-warning/10 text-warning", valueClass: "text-warning" },
+    { label: "Settled", value: formatInr(stats.settled), icon: CheckCircle2, iconClass: "bg-success/10 text-success", valueClass: "text-success" },
+    { label: "Rejected", value: formatInr(stats.rejected), icon: XCircle, iconClass: "bg-destructive/10 text-destructive", valueClass: "text-destructive" },
+  ];
+
   return (
     <div className="min-w-0 space-y-6">
-      <div>
-        <p className="text-sm text-slate-500">Track payouts and settlement status for your orders.</p>
-      </div>
+      <p className="text-sm text-muted-foreground">Track payouts and settlement status for your orders.</p>
 
-      {err ? <p className="text-sm text-red-600">{err}</p> : null}
+      {err ? (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
+          {err}
+        </div>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="rounded-[14px] border border-slate-100 bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.06)]">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <p className="text-sm font-medium text-slate-500">Total Earned</p>
-              <p className="mt-2 text-2xl font-bold tracking-tight text-emerald-700">{formatInr(stats.totalEarned)}</p>
-            </div>
-            <div className="rounded-xl bg-emerald-50 p-2.5 text-emerald-600">
-              <DollarSign className="h-6 w-6" aria-hidden />
-            </div>
-          </div>
-        </div>
-        <div className="rounded-[14px] border border-slate-100 bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.06)]">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <p className="text-sm font-medium text-slate-500">Pending Settlement</p>
-              <p className="mt-2 text-2xl font-bold tracking-tight text-amber-600">{formatInr(stats.pending)}</p>
-            </div>
-            <div className="rounded-xl bg-amber-50 p-2.5 text-amber-600">
-              <Clock3 className="h-6 w-6" aria-hidden />
-            </div>
-          </div>
-        </div>
-        <div className="rounded-[14px] border border-slate-100 bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.06)]">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <p className="text-sm font-medium text-slate-500">Settled</p>
-              <p className="mt-2 text-2xl font-bold tracking-tight text-emerald-700">{formatInr(stats.settled)}</p>
-            </div>
-            <div className="rounded-xl bg-emerald-50 p-2.5 text-emerald-600">
-              <CheckCircle2 className="h-6 w-6" aria-hidden />
-            </div>
-          </div>
-        </div>
-        <div className="rounded-[14px] border border-slate-100 bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.06)]">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <p className="text-sm font-medium text-slate-500">Rejected</p>
-              <p className="mt-2 text-2xl font-bold tracking-tight text-rose-600">{formatInr(stats.rejected)}</p>
-            </div>
-            <div className="rounded-xl bg-rose-50 p-2.5 text-rose-600">
-              <XCircle className="h-6 w-6" aria-hidden />
-            </div>
-          </div>
-        </div>
+        {loading
+          ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)
+          : statCards.map((s) => (
+              <Card key={s.label} className="p-5">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">{s.label}</p>
+                    <p className={cn("mt-2 text-2xl font-bold tracking-tight", s.valueClass)}>{s.value}</p>
+                  </div>
+                  <div className={cn("rounded-xl p-2.5", s.iconClass)}>
+                    <s.icon className="h-6 w-6" aria-hidden />
+                  </div>
+                </div>
+              </Card>
+            ))}
       </div>
 
       <div>
-        <h2 className="text-base font-semibold text-slate-800">
+        <h2 className="text-base font-semibold text-foreground">
           {total} {total === 1 ? "settlement" : "settlements"}
         </h2>
 
         {loading ? (
-          <p className="mt-4 text-slate-600">Loading settlements…</p>
+          <ul className="mt-4 space-y-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-32 rounded-2xl" />
+            ))}
+          </ul>
         ) : items.length === 0 ? (
-          <div className="mt-4 rounded-[14px] border border-slate-100 bg-white p-12 text-center text-slate-600 shadow-[0_2px_12px_rgba(15,23,42,0.06)]">
+          <Card className="mt-4 p-12 text-center text-muted-foreground">
             No settlements yet. They appear after customer orders are paid and processed.
-          </div>
+          </Card>
         ) : (
           <ul className="mt-4 space-y-4">
             {items.map((row) => {
@@ -143,38 +130,40 @@ export default function VendorSettlementsView() {
                   : "—";
 
               return (
-                <li
-                  key={row.id}
-                  className="flex flex-col gap-4 rounded-[14px] border border-slate-100 bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.06)] sm:flex-row sm:items-start sm:justify-between"
-                >
-                  <div className="min-w-0 flex-1 space-y-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-base font-bold text-slate-900">{displaySettlementRef(row)}</span>
-                      <span
-                        className={`rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${statusBadgeClass(row.status)}`}
-                      >
-                        {row.status}
-                      </span>
+                <li key={row.id}>
+                  <Card className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0 flex-1 space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-base font-bold text-foreground">{displaySettlementRef(row)}</span>
+                        <span
+                          className={cn(
+                            "rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize",
+                            statusBadgeClass(row.status),
+                          )}
+                        >
+                          {row.status}
+                        </span>
+                      </div>
+                      <div className="space-y-1 text-sm text-muted-foreground">
+                        <p>
+                          <span className="font-medium text-foreground">Order:</span> {orderRef}
+                        </p>
+                        <p>
+                          <span className="font-medium text-foreground">Txn:</span> {txn}
+                        </p>
+                        <p>
+                          <span className="font-medium text-foreground">Gross:</span> {formatInr(gross)}
+                          <span className="mx-2 text-border">|</span>
+                          <span className="font-medium text-foreground">Commission:</span> {formatInr(commission)}
+                          <span className="mx-2 text-border">|</span>
+                          <span className="font-medium text-foreground">Settled:</span> {settledLabel}
+                        </p>
+                      </div>
                     </div>
-                    <div className="space-y-1 text-sm text-slate-500">
-                      <p>
-                        <span className="font-medium text-slate-600">Order:</span> {orderRef}
-                      </p>
-                      <p>
-                        <span className="font-medium text-slate-600">Txn:</span> {txn}
-                      </p>
-                      <p className="text-slate-600">
-                        <span className="font-medium">Gross:</span> {formatInr(gross)}
-                        <span className="mx-2 text-slate-300">|</span>
-                        <span className="font-medium">Commission:</span> {formatInr(commission)}
-                        <span className="mx-2 text-slate-300">|</span>
-                        <span className="font-medium">Settled:</span> {settledLabel}
-                      </p>
+                    <div className="shrink-0 text-left sm:text-right">
+                      <p className="text-2xl font-bold text-success">{formatInr(row.amount)}</p>
                     </div>
-                  </div>
-                  <div className="shrink-0 text-left sm:text-right">
-                    <p className="text-2xl font-bold text-emerald-700">{formatInr(row.amount)}</p>
-                  </div>
+                  </Card>
                 </li>
               );
             })}

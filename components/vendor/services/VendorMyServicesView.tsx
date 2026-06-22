@@ -1,7 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, MoreVertical, Plus, Search, Wrench } from "lucide-react";
+import { MoreVertical, Plus, Search, Wrench } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getVendorMe, type VendorProfile } from "@/lib/api/vendor";
 import {
   vendorOfferedServicesApi,
@@ -12,7 +17,6 @@ import {
 } from "@/lib/api/vendorOfferedServices";
 import { vendorUploadImage } from "@/lib/api/vendorUpload";
 import { formatInr } from "@/lib/vendor/profileDisplay";
-import { resolveMediaUrl } from "@/lib/media";
 
 const PRICE_TYPES: { value: PriceType; label: string }[] = [
   { value: "fixed", label: "Fixed" },
@@ -23,7 +27,11 @@ const PRICE_TYPES: { value: PriceType; label: string }[] = [
 const YES_NO = ["Yes", "No"] as const;
 
 function mediaUrl(u: string) {
-  return resolveMediaUrl(u) || "";
+  if (!u) return "";
+  if (/^https?:\/\//i.test(u)) return u;
+  const base = (process.env.NEXT_PUBLIC_API_GATEWAY_URL || "").replace(/\/$/, "");
+  if (base) return `${base}${u.startsWith("/") ? u : `/${u}`}`;
+  return u;
 }
 
 function metaStr(m: Record<string, unknown> | null | undefined, k: string): string {
@@ -290,16 +298,19 @@ export default function VendorMyServicesView() {
 
   if (loading) {
     return (
-      <div className="flex min-w-0 items-center justify-center gap-2 py-20 text-slate-600">
-        <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-        Loading services…
+      <div className="min-w-0 space-y-4 py-6">
+        <Skeleton className="h-10 w-40" />
+        <Skeleton className="h-12 rounded-xl" />
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Skeleton key={i} className="h-28 rounded-2xl" />
+        ))}
       </div>
     );
   }
 
   if (!isServiceVendor) {
     return (
-      <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+      <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-foreground">
         My Services is only available for <strong>service</strong> vendors. Switch to the product dashboard if you sell
         physical goods.
       </div>
@@ -311,45 +322,41 @@ export default function VendorMyServicesView() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           {items.length > 0 ? (
-            <p className="text-sm font-medium text-slate-600" aria-live="polite">
+            <p className="text-sm font-medium text-muted-foreground" aria-live="polite">
               {items.length} listing{items.length === 1 ? "" : "s"}
             </p>
           ) : null}
-          <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500">
-            Admin approving your <strong className="font-semibold text-slate-700">service vendor</strong> account does
-            not create listings here. Each row is a <strong className="font-semibold text-slate-700">link</strong> between
-            your business and a catalog service template — use <strong className="font-semibold text-slate-700">Add Service</strong>{" "}
+          <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+            Admin approving your <strong className="font-semibold text-foreground">service vendor</strong> account does
+            not create listings here. Each row is a <strong className="font-semibold text-foreground">link</strong> between
+            your business and a catalog service template — use <strong className="font-semibold text-foreground">Add Service</strong>{" "}
             to choose a template, set your price, and submit for review when required.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => openAdd()}
-          className="inline-flex shrink-0 items-center gap-2 self-start rounded-xl bg-[#20a090] px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-[#188a7c]"
-        >
+        <Button type="button" onClick={() => openAdd()} className="shrink-0 gap-2 self-start">
           <Plus className="h-4 w-4" aria-hidden />
           Add Service
-        </button>
+        </Button>
       </div>
 
-      {err ? <p className="text-sm text-red-600">{err}</p> : null}
+      {err ? <p className="text-sm text-destructive">{err}</p> : null}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative min-w-0 flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" aria-hidden />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" aria-hidden />
           <input
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search services…"
-            className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-base text-slate-900 outline-none placeholder:text-slate-400 focus:border-[#20a090]/50 focus:ring-2 focus:ring-[#20a090]/20"
+            className="w-full rounded-xl border border-border bg-card py-3 pl-11 pr-4 text-base text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/50 focus:ring-2 focus:ring-primary/20"
           />
         </div>
         <div className="relative shrink-0">
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value as StatusFilter)}
-            className="appearance-none rounded-xl border border-slate-200 bg-white py-3 pl-4 pr-10 text-sm font-semibold text-slate-800 outline-none focus:border-[#20a090]/50 focus:ring-2 focus:ring-[#20a090]/20"
+            className="appearance-none rounded-xl border border-border bg-card py-3 pl-4 pr-10 text-sm font-semibold text-foreground outline-none focus:border-primary/50 focus:ring-2 focus:ring-primary/20"
             aria-label="Status filter"
           >
             <option value="all">All statuses</option>
@@ -357,7 +364,7 @@ export default function VendorMyServicesView() {
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </select>
-          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">▾</span>
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">▾</span>
         </div>
       </div>
 
@@ -373,9 +380,9 @@ export default function VendorMyServicesView() {
           return (
             <li
               key={row.id}
-              className="relative flex gap-4 rounded-[14px] border border-slate-100 bg-white p-4 shadow-[0_2px_12px_rgba(15,23,42,0.06)] sm:p-5"
+              className="relative flex gap-4 rounded-2xl border border-border bg-card p-4  sm:p-5"
             >
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-slate-100 text-slate-400 ring-1 ring-slate-200/80">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted text-muted-foreground ring-1 ring-border/80">
                 {icon ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -392,42 +399,42 @@ export default function VendorMyServicesView() {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-base font-bold text-slate-900 sm:text-lg">{title}</h2>
+                  <h2 className="text-base font-bold text-foreground sm:text-lg">{title}</h2>
                   {pendingMod ? (
-                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900 ring-1 ring-amber-200/80">
+                    <span className="rounded-full bg-warning/10 px-2 py-0.5 text-xs font-semibold text-warning ring-1 ring-warning/20/80">
                       pending approval
                     </span>
                   ) : null}
                   {!pendingMod && !row.isActive ? (
-                    <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold capitalize text-rose-700 ring-1 ring-rose-200/80">
+                    <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-semibold capitalize text-destructive ring-1 ring-destructive/20/80">
                       inactive
                     </span>
                   ) : null}
                 </div>
-                <p className="mt-1 text-base font-semibold text-slate-800">{formatInr(priceNum)}</p>
-                {(duration || city) && <p className="mt-1 text-sm text-slate-500">{[duration, city].filter(Boolean).join(" · ")}</p>}
+                <p className="mt-1 text-base font-semibold text-foreground">{formatInr(priceNum)}</p>
+                {(duration || city) && <p className="mt-1 text-sm text-muted-foreground">{[duration, city].filter(Boolean).join(" · ")}</p>}
               </div>
               <div className="relative shrink-0" ref={menuOpenId === row.id ? menuRef : undefined}>
                 <button
                   type="button"
-                  className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                  className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
                   aria-label="More actions"
                   onClick={() => setMenuOpenId((id) => (id === row.id ? null : row.id))}
                 >
                   <MoreVertical className="h-5 w-5" aria-hidden />
                 </button>
                 {menuOpenId === row.id ? (
-                  <div className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+                  <div className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-xl border border-border bg-card py-1 shadow-lg">
                     <button
                       type="button"
-                      className="block w-full px-4 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"
+                      className="block w-full px-4 py-2 text-left text-sm font-medium text-foreground hover:bg-muted"
                       onClick={() => openEdit(row)}
                     >
                       Edit
                     </button>
                     <button
                       type="button"
-                      className="block w-full px-4 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="block w-full px-4 py-2 text-left text-sm font-medium text-foreground hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
                       disabled={pendingMod}
                       title={pendingMod ? "Awaiting admin approval" : undefined}
                       onClick={() => void toggleActive(row)}
@@ -436,7 +443,7 @@ export default function VendorMyServicesView() {
                     </button>
                     <button
                       type="button"
-                      className="block w-full px-4 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50"
+                      className="block w-full px-4 py-2 text-left text-sm font-medium text-destructive hover:bg-destructive/10"
                       onClick={() => void removeRow(row.id)}
                     >
                       Delete
@@ -450,14 +457,14 @@ export default function VendorMyServicesView() {
       </ul>
 
       {filtered.length === 0 ? (
-        <div className="rounded-[14px] border border-dashed border-slate-200 bg-white px-6 py-12 text-center text-slate-600">
+        <div className="rounded-2xl border border-dashed border-border bg-card px-6 py-12 text-center text-muted-foreground">
           {items.length === 0 ? (
             <>
-              <p className="text-base font-medium text-slate-800">No linked services yet</p>
-              <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-500">
+              <p className="text-base font-medium text-foreground">No linked services yet</p>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
                 Seeing your business on the admin &quot;Service vendors&quot; list only means your vendor profile exists.
                 To appear in customer search and bookings, add at least one catalog service with{" "}
-                <span className="font-semibold text-slate-700">Add Service</span>.
+                <span className="font-semibold text-foreground">Add Service</span>.
               </p>
             </>
           ) : (
@@ -473,22 +480,22 @@ export default function VendorMyServicesView() {
           role="presentation"
         >
           <div
-            className="max-h-[min(92vh,900px)] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl sm:p-8"
+            className="max-h-[min(92vh,900px)] w-full max-w-2xl overflow-y-auto rounded-2xl bg-card p-6 shadow-2xl sm:p-8"
             role="dialog"
             aria-modal="true"
             aria-labelledby="svc-modal-title"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 id="svc-modal-title" className="text-xl font-bold text-slate-900">
+            <h2 id="svc-modal-title" className="text-xl font-bold text-foreground">
               {modal === "add" ? "Add service" : "Edit service"}
             </h2>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-muted-foreground">
               Matches admin catalog service fields: template name and category are fixed; you set price, overrides, and
               listing options. Your customer price is required below.
             </p>
 
             {editingListingPending ? (
-              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              <div className="mt-4 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-foreground">
                 This listing is <strong>pending admin approval</strong>. You can edit details below; it appears in the public
                 services catalog only after an administrator approves it. Availability and “listing active” are locked
                 until then.
@@ -497,9 +504,9 @@ export default function VendorMyServicesView() {
 
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               <label className={modal === "edit" ? "sm:col-span-2 opacity-60" : "sm:col-span-2"}>
-                <span className="text-sm font-semibold text-slate-800">Catalog service *</span>
+                <span className="text-sm font-semibold text-foreground">Catalog service *</span>
                 <select
-                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none focus:border-[#20a090] focus:ring-2 focus:ring-[#20a090]/20 disabled:cursor-not-allowed"
+                  className="mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed"
                   value={form.serviceId}
                   disabled={modal === "edit"}
                   onChange={(e) => setForm((f) => ({ ...f, serviceId: e.target.value }))}
@@ -517,28 +524,28 @@ export default function VendorMyServicesView() {
               </label>
 
               {selectedCatalogItem ? (
-                <div className="sm:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <div className="sm:col-span-2 rounded-xl border border-border bg-muted/50 p-4 text-sm text-foreground">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Catalog template (same as admin “service name” + category)
                   </p>
-                  <p className="mt-2 text-base font-semibold text-slate-900">{selectedCatalogItem.name}</p>
-                  <p className="mt-1 text-slate-600">
+                  <p className="mt-2 text-base font-semibold text-foreground">{selectedCatalogItem.name}</p>
+                  <p className="mt-1 text-muted-foreground">
                     Category:{" "}
-                    <span className="text-slate-900">
+                    <span className="text-foreground">
                       {selectedCatalogItem.serviceCategoryId
                         ? categoryNameById.get(selectedCatalogItem.serviceCategoryId) || "—"
                         : "—"}
                     </span>
                   </p>
                   {selectedCatalogItem.description ? (
-                    <p className="mt-3 max-h-28 overflow-y-auto whitespace-pre-wrap text-slate-600">
+                    <p className="mt-3 max-h-28 overflow-y-auto whitespace-pre-wrap text-muted-foreground">
                       {selectedCatalogItem.description}
                     </p>
                   ) : (
-                    <p className="mt-2 text-xs text-slate-500">No catalog description on this template.</p>
+                    <p className="mt-2 text-xs text-muted-foreground">No catalog description on this template.</p>
                   )}
                   {selectedCatalogItem.basePrice != null && String(selectedCatalogItem.basePrice).trim() !== "" ? (
-                    <p className="mt-3 text-xs text-slate-500">
+                    <p className="mt-3 text-xs text-muted-foreground">
                       Catalog base price (reference): ₹{String(selectedCatalogItem.basePrice)}
                     </p>
                   ) : null}
@@ -546,9 +553,9 @@ export default function VendorMyServicesView() {
               ) : null}
 
               <label className="sm:col-span-2">
-                <span className="text-sm font-semibold text-slate-800">Display name (optional)</span>
+                <span className="text-sm font-semibold text-foreground">Display name (optional)</span>
                 <input
-                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none focus:border-[#20a090] focus:ring-2 focus:ring-[#20a090]/20"
+                  className="mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                   value={form.displayName}
                   onChange={(e) => setForm((f) => ({ ...f, displayName: e.target.value }))}
                   placeholder="Overrides catalog name in your listings"
@@ -556,9 +563,9 @@ export default function VendorMyServicesView() {
               </label>
 
               <label className="sm:col-span-2">
-                <span className="text-sm font-semibold text-slate-800">Description</span>
+                <span className="text-sm font-semibold text-foreground">Description</span>
                 <textarea
-                  className="mt-2 min-h-[100px] w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none focus:border-[#20a090] focus:ring-2 focus:ring-[#20a090]/20"
+                  className="mt-2 min-h-[100px] w-full rounded-xl border border-border px-4 py-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                   value={form.description}
                   onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
                   placeholder="What the customer gets"
@@ -566,9 +573,9 @@ export default function VendorMyServicesView() {
               </label>
 
               <div className="sm:col-span-2 space-y-2">
-                <span className="text-sm font-semibold text-slate-800">Icon / image</span>
+                <span className="text-sm font-semibold text-foreground">Icon / image</span>
                 <div className="flex flex-wrap items-center gap-3">
-                  <label className="inline-flex cursor-pointer items-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 hover:bg-slate-50">
+                  <label className="inline-flex cursor-pointer items-center rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted">
                     <input
                       type="file"
                       accept="image/*"
@@ -581,7 +588,7 @@ export default function VendorMyServicesView() {
                   {form.iconUrl ? (
                     <button
                       type="button"
-                      className="text-sm text-red-600 hover:underline"
+                      className="text-sm text-destructive hover:underline"
                       disabled={saving}
                       onClick={() => setForm((f) => ({ ...f, iconUrl: "" }))}
                     >
@@ -594,17 +601,17 @@ export default function VendorMyServicesView() {
                   <img
                     src={mediaUrl(form.iconUrl)}
                     alt=""
-                    className="mt-2 h-16 w-16 rounded-lg border border-slate-200 object-cover"
+                    className="mt-2 h-16 w-16 rounded-lg border border-border object-cover"
                   />
                 ) : (
-                  <p className="text-xs text-slate-500">Square image recommended — JPEG, PNG, WebP, up to 8 MB.</p>
+                  <p className="text-xs text-muted-foreground">Square image recommended — JPEG, PNG, WebP, up to 8 MB.</p>
                 )}
               </div>
 
               <label>
-                <span className="text-sm font-semibold text-slate-800">Your price (₹) *</span>
+                <span className="text-sm font-semibold text-foreground">Your price (₹) *</span>
                 <input
-                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none focus:border-[#20a090] focus:ring-2 focus:ring-[#20a090]/20"
+                  className="mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                   inputMode="decimal"
                   value={form.price}
                   onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
@@ -613,9 +620,9 @@ export default function VendorMyServicesView() {
               </label>
 
               <label>
-                <span className="text-sm font-semibold text-slate-800">Reference base price (optional)</span>
+                <span className="text-sm font-semibold text-foreground">Reference base price (optional)</span>
                 <input
-                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none focus:border-[#20a090] focus:ring-2 focus:ring-[#20a090]/20"
+                  className="mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                   value={form.basePrice}
                   onChange={(e) => setForm((f) => ({ ...f, basePrice: e.target.value }))}
                   placeholder="Shown as reference only"
@@ -623,9 +630,9 @@ export default function VendorMyServicesView() {
               </label>
 
               <label>
-                <span className="text-sm font-semibold text-slate-800">Price type</span>
+                <span className="text-sm font-semibold text-foreground">Price type</span>
                 <select
-                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none focus:border-[#20a090] focus:ring-2 focus:ring-[#20a090]/20"
+                  className="mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                   value={form.priceType}
                   onChange={(e) => setForm((f) => ({ ...f, priceType: e.target.value as PriceType }))}
                 >
@@ -638,9 +645,9 @@ export default function VendorMyServicesView() {
               </label>
 
               <label>
-                <span className="text-sm font-semibold text-slate-800">Duration</span>
+                <span className="text-sm font-semibold text-foreground">Duration</span>
                 <input
-                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none focus:border-[#20a090] focus:ring-2 focus:ring-[#20a090]/20"
+                  className="mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                   value={form.duration}
                   onChange={(e) => setForm((f) => ({ ...f, duration: e.target.value }))}
                   placeholder="e.g. 1–2 hours"
@@ -648,9 +655,9 @@ export default function VendorMyServicesView() {
               </label>
 
               <label>
-                <span className="text-sm font-semibold text-slate-800">City / area</span>
+                <span className="text-sm font-semibold text-foreground">City / area</span>
                 <input
-                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none focus:border-[#20a090] focus:ring-2 focus:ring-[#20a090]/20"
+                  className="mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                   value={form.city}
                   onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
                   placeholder="e.g. Coimbatore"
@@ -658,9 +665,9 @@ export default function VendorMyServicesView() {
               </label>
 
               <label>
-                <span className="text-sm font-semibold text-slate-800">Availability</span>
+                <span className="text-sm font-semibold text-foreground">Availability</span>
                 <select
-                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none focus:border-[#20a090] focus:ring-2 focus:ring-[#20a090]/20 disabled:cursor-not-allowed disabled:bg-slate-50"
+                  className="mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted/50"
                   value={form.availability}
                   disabled={editingListingPending}
                   onChange={(e) => setForm((f) => ({ ...f, availability: e.target.value }))}
@@ -674,9 +681,9 @@ export default function VendorMyServicesView() {
               </label>
 
               <label>
-                <span className="text-sm font-semibold text-slate-800">Trending</span>
+                <span className="text-sm font-semibold text-foreground">Trending</span>
                 <select
-                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none focus:border-[#20a090] focus:ring-2 focus:ring-[#20a090]/20"
+                  className="mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                   value={form.trending}
                   onChange={(e) => setForm((f) => ({ ...f, trending: e.target.value }))}
                 >
@@ -689,9 +696,9 @@ export default function VendorMyServicesView() {
               </label>
 
               <label>
-                <span className="text-sm font-semibold text-slate-800">Emergency service</span>
+                <span className="text-sm font-semibold text-foreground">Emergency service</span>
                 <select
-                  className="mt-2 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-900 outline-none focus:border-[#20a090] focus:ring-2 focus:ring-[#20a090]/20"
+                  className="mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
                   value={form.emergency}
                   onChange={(e) => setForm((f) => ({ ...f, emergency: e.target.value }))}
                 >
@@ -706,12 +713,12 @@ export default function VendorMyServicesView() {
               <label className="flex items-center gap-3 sm:col-span-2">
                 <input
                   type="checkbox"
-                  className="h-4 w-4 rounded border-slate-300 text-[#20a090] focus:ring-[#20a090] disabled:cursor-not-allowed"
+                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary disabled:cursor-not-allowed"
                   checked={form.isActive}
                   disabled={editingListingPending}
                   onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
                 />
-                <span className="text-sm font-semibold text-slate-800">Listing active (visible when approved)</span>
+                <span className="text-sm font-semibold text-foreground">Listing active (visible when approved)</span>
               </label>
             </div>
 
@@ -720,7 +727,7 @@ export default function VendorMyServicesView() {
                 type="button"
                 disabled={saving}
                 onClick={() => setModal(null)}
-                className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                className="rounded-xl border border-border px-5 py-2.5 text-sm font-semibold text-foreground hover:bg-muted"
               >
                 Cancel
               </button>
@@ -728,7 +735,7 @@ export default function VendorMyServicesView() {
                 type="button"
                 disabled={saving}
                 onClick={() => void submitForm()}
-                className="rounded-xl bg-[#20a090] px-5 py-2.5 text-sm font-semibold text-white hover:bg-[#188a7c] disabled:opacity-60"
+                className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-60"
               >
                 {saving ? "Saving…" : modal === "add" ? "Save" : "Update"}
               </button>

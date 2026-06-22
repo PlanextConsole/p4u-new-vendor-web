@@ -1,10 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarCheck, CheckCircle2, Clock3, Loader2 } from "lucide-react";
+import { CalendarCheck, CheckCircle2, Clock3 } from "lucide-react";
 import type { VendorBookingRow } from "@/lib/api/vendorBookings";
 import { vendorBookingsApi } from "@/lib/api/vendorBookings";
 import { vendorOfferedServicesApi } from "@/lib/api/vendorOfferedServices";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 20;
 
@@ -39,21 +44,22 @@ function statusTone(status: string): "pending" | "progress" | "done" | "muted" {
   const s = status.toLowerCase();
   if (s === "pending") return "pending";
   if (s === "approved") return "progress";
+  if (s === "in_progress") return "progress";
   if (s === "completed") return "done";
   if (s === "rejected" || s === "cancelled") return "muted";
   return "muted";
 }
 
-function badgeClass(tone: ReturnType<typeof statusTone>): string {
+function badgeVariant(tone: ReturnType<typeof statusTone>): "warning" | "default" | "success" | "secondary" {
   switch (tone) {
     case "pending":
-      return "bg-amber-50 text-amber-900 ring-1 ring-amber-200/80";
+      return "warning";
     case "progress":
-      return "bg-[#20a090]/12 text-[#0f766e] ring-1 ring-[#20a090]/25";
+      return "default";
     case "done":
-      return "bg-emerald-50 text-emerald-900 ring-1 ring-emerald-200/80";
+      return "success";
     default:
-      return "bg-slate-100 text-slate-600 ring-1 ring-slate-200/80";
+      return "secondary";
   }
 }
 
@@ -65,7 +71,6 @@ export default function VendorServiceBookingsPage() {
   const [err, setErr] = useState("");
   const [actionId, setActionId] = useState<string | null>(null);
   const [counts, setCounts] = useState({ pending: 0, inProgress: 0, completed: 0 });
-
   const [serviceNames, setServiceNames] = useState<Record<string, string>>({});
 
   const refreshCounts = useCallback(async () => {
@@ -135,7 +140,7 @@ export default function VendorServiceBookingsPage() {
   const canPrev = offset > 0;
   const canNext = offset + PAGE_SIZE < total;
 
-  async function review(row: VendorBookingRow, decision: "approved" | "rejected") {
+  async function review(row: VendorBookingRow, decision: "approved" | "rejected" | "completed" | "in_progress") {
     setActionId(row.id);
     setErr("");
     try {
@@ -152,78 +157,53 @@ export default function VendorServiceBookingsPage() {
 
   const summary = useMemo(
     () => [
-      {
-        key: "pending",
-        label: "Pending",
-        value: counts.pending,
-        icon: Clock3,
-        iconClass: "text-amber-600 bg-amber-50 ring-amber-200/80",
-        valueClass: "text-amber-700",
-      },
-      {
-        key: "inProgress",
-        label: "In progress",
-        value: counts.inProgress,
-        icon: CalendarCheck,
-        iconClass: "text-[#0f766e] bg-[#20a090]/12 ring-[#20a090]/25",
-        valueClass: "text-[#0f766e]",
-      },
-      {
-        key: "completed",
-        label: "Completed",
-        value: counts.completed,
-        icon: CheckCircle2,
-        iconClass: "text-emerald-700 bg-emerald-50 ring-emerald-200/80",
-        valueClass: "text-emerald-800",
-      },
+      { key: "pending", label: "Pending", value: counts.pending, icon: Clock3, iconClass: "bg-warning/10 text-warning", valueClass: "text-warning" },
+      { key: "inProgress", label: "In progress", value: counts.inProgress, icon: CalendarCheck, iconClass: "bg-primary/10 text-primary", valueClass: "text-primary" },
+      { key: "completed", label: "Completed", value: counts.completed, icon: CheckCircle2, iconClass: "bg-success/10 text-success", valueClass: "text-success" },
     ],
     [counts],
   );
 
   return (
     <div className="min-w-0 space-y-6">
-      <div>
-        <p className="text-sm text-slate-500">Review and manage customer service requests.</p>
-      </div>
+      <p className="text-sm text-muted-foreground">Review and manage customer service requests.</p>
 
       <div className="grid gap-4 sm:grid-cols-3">
         {summary.map(({ key, label, value, icon: Icon, iconClass, valueClass }) => (
-          <div
-            key={key}
-            className="flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-5 shadow-[0_2px_12px_rgba(15,23,42,0.06)]"
-          >
-            <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ring-1 ${iconClass}`}>
+          <Card key={key} className="flex items-center gap-4 p-5">
+            <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl", iconClass)}>
               <Icon className="h-6 w-6" aria-hidden />
             </div>
             <div>
-              <p className={`text-3xl font-semibold tabular-nums leading-none ${valueClass}`}>{value}</p>
-              <p className="mt-1.5 text-sm font-medium text-slate-600">{label}</p>
+              <p className={cn("text-3xl font-semibold tabular-nums leading-none", valueClass)}>{value}</p>
+              <p className="mt-1.5 text-sm font-medium text-muted-foreground">{label}</p>
             </div>
-          </div>
+          </Card>
         ))}
       </div>
 
       {err ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
           {err}
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-[0_2px_12px_rgba(15,23,42,0.06)]">
+      <Card className="overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center gap-2 py-20 text-slate-500">
-            <Loader2 className="h-5 w-5 animate-spin" aria-hidden />
-            Loading bookings…
+          <div className="space-y-3 p-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-12 rounded-lg" />
+            ))}
           </div>
         ) : items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-20 text-slate-500">
-            <CalendarCheck className="h-12 w-12 text-slate-300" aria-hidden />
-            <p className="text-sm font-medium text-slate-600">No service bookings yet</p>
+          <div className="flex flex-col items-center justify-center gap-3 py-20 text-muted-foreground">
+            <CalendarCheck className="h-12 w-12 text-muted-foreground/40" aria-hidden />
+            <p className="text-sm font-medium">No service bookings yet</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-sm">
-              <thead className="border-b border-slate-100 bg-slate-50/80 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <thead className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 <tr>
                   <th className="px-4 py-3">Booking</th>
                   <th className="px-4 py-3">Customer</th>
@@ -234,45 +214,52 @@ export default function VendorServiceBookingsPage() {
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-border">
                 {items.map((row) => {
                   const st = String(row.status || "pending").toLowerCase();
                   const tone = statusTone(st);
                   const busy = actionId === row.id;
                   return (
-                    <tr key={row.id} className="hover:bg-slate-50/60">
-                      <td className="whitespace-nowrap px-4 py-3 font-semibold text-slate-900">{bookingRef(row.id)}</td>
-                      <td className="max-w-[180px] truncate px-4 py-3 text-slate-700">{customerLabel(row)}</td>
-                      <td className="max-w-[200px] truncate px-4 py-3 text-slate-700">{serviceLabel(row.serviceId)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatBookingDate(row.bookingDate)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-700">{row.timeSlot || "—"}</td>
+                    <tr key={row.id} className="hover:bg-muted/30">
+                      <td className="whitespace-nowrap px-4 py-3 font-semibold text-foreground">{bookingRef(row.id)}</td>
+                      <td className="max-w-[180px] truncate px-4 py-3 text-foreground">{customerLabel(row)}</td>
+                      <td className="max-w-[200px] truncate px-4 py-3 text-foreground">{serviceLabel(row.serviceId)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-foreground">{formatBookingDate(row.bookingDate)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-foreground">{row.timeSlot || "—"}</td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${badgeClass(tone)}`}>
+                        <Badge variant={badgeVariant(tone)} className="capitalize">
                           {st}
-                        </span>
+                        </Badge>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-right">
                         {st === "pending" ? (
                           <div className="flex justify-end gap-2">
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => void review(row, "approved")}
-                              className="rounded-lg bg-[#20a090] px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-[#1a8f80] disabled:opacity-50"
-                            >
+                            <Button type="button" size="sm" disabled={busy} onClick={() => void review(row, "approved")}>
                               Approve
-                            </button>
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => void review(row, "rejected")}
-                              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                            >
+                            </Button>
+                            <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void review(row, "rejected")}>
                               Reject
-                            </button>
+                            </Button>
+                          </div>
+                        ) : st === "approved" || st === "in_progress" ? (
+                          <div className="flex justify-end gap-2">
+                            {st === "approved" ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={busy}
+                                onClick={() => void review(row, "in_progress")}
+                              >
+                                Start
+                              </Button>
+                            ) : null}
+                            <Button type="button" size="sm" disabled={busy} onClick={() => void review(row, "completed")}>
+                              Complete
+                            </Button>
                           </div>
                         ) : (
-                          <span className="text-xs text-slate-400">—</span>
+                          <span className="text-xs text-muted-foreground">—</span>
                         )}
                       </td>
                     </tr>
@@ -284,31 +271,21 @@ export default function VendorServiceBookingsPage() {
         )}
 
         {!loading && items.length > 0 ? (
-          <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3 text-sm text-slate-600">
+          <div className="flex items-center justify-between border-t border-border px-4 py-3 text-sm text-muted-foreground">
             <span>
               Showing {offset + 1}–{Math.min(offset + items.length, total)} of {total}
             </span>
             <div className="flex gap-2">
-              <button
-                type="button"
-                disabled={!canPrev}
-                onClick={() => setOffset((o) => Math.max(0, o - PAGE_SIZE))}
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-              >
+              <Button type="button" size="sm" variant="outline" disabled={!canPrev} onClick={() => setOffset((o) => Math.max(0, o - PAGE_SIZE))}>
                 Previous
-              </button>
-              <button
-                type="button"
-                disabled={!canNext}
-                onClick={() => setOffset((o) => o + PAGE_SIZE)}
-                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-              >
+              </Button>
+              <Button type="button" size="sm" variant="outline" disabled={!canNext} onClick={() => setOffset((o) => o + PAGE_SIZE)}>
                 Next
-              </button>
+              </Button>
             </div>
           </div>
         ) : null}
-      </div>
+      </Card>
     </div>
   );
 }

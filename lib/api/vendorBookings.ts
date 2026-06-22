@@ -35,10 +35,17 @@ export const vendorBookingsApi = {
     return apiClient.get<VendorBookingListResponse>(`${BASE}/bookings/vendor`, q);
   },
 
-  updateStatus(bookingId: string, status: "approved" | "rejected") {
+  updateStatus(
+    bookingId: string,
+    status: "approved" | "rejected" | "in_progress" | "completed" | "cancelled",
+  ) {
     return apiClient.patch<VendorBookingRow>(
       `${BASE}/bookings/${encodeURIComponent(bookingId)}/status`,
       { status },
     );
+  },
+
+  get(bookingId: string) {
+    return apiClient.get<VendorBookingRow>(`${BASE}/bookings/vendor/${encodeURIComponent(bookingId)}`);
   },
 };

@@ -10,6 +10,14 @@ import {
   type VendorOnboardingPayload,
 } from "@/lib/api/onboarding";
 import { getStoredUsername, hasAccessToken, signOutVendorCompletely } from "@/lib/authSession";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import {
+  AuthPageBackground,
+  FormField,
+  ReviewRow,
+  WizardStepBar,
+} from "@/components/auth/auth-ui";
 
 const STEPS = ["Details", "KYC & Documents", "Bank", "Review"] as const;
 
@@ -211,122 +219,103 @@ export default function VendorOnboardingPage() {
 
   if (bootstrap) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-slate-600">
-        <Loader2 className="h-5 w-5 animate-spin" /> &nbsp;Loading your application…
-      </div>
+      <AuthPageBackground>
+        <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 text-muted-foreground">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          <p className="text-sm">Loading your application…</p>
+        </div>
+      </AuthPageBackground>
     );
   }
 
   const username = getStoredUsername();
 
   return (
-    <div className="min-h-screen bg-[#f5f6f4] pb-12 pt-8">
-      <div className="mx-auto max-w-3xl px-4">
+    <AuthPageBackground>
+      <div className="mx-auto max-w-3xl px-4 pb-12 pt-8">
         <header className="mb-8 flex items-center gap-3">
-          <Link href="/" className="rounded-lg p-2 hover:bg-white" aria-label="Back to login">
-            <ArrowLeft className="h-5 w-5 text-slate-600" />
+          <Link href="/" className="rounded-xl p-2 hover:bg-card/80" aria-label="Back to login">
+            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
           </Link>
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-vendor-teal text-white">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-md">
             <Store className="h-5 w-5" />
           </div>
           <div className="min-w-0 flex-1">
-            <h1 className="text-lg font-semibold text-slate-900">Complete your vendor profile</h1>
-            <p className="truncate text-sm text-slate-500">
-              {username ? `Signed in as ${username} · ` : ""}fill your business details to access
-              the dashboard
+            <h1 className="text-lg font-bold text-foreground">Complete your vendor profile</h1>
+            <p className="truncate text-sm text-muted-foreground">
+              {username ? `Signed in as ${username} · ` : ""}fill your business details to access the dashboard
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => void logout()}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-white"
-          >
+          <Button type="button" variant="outline" size="sm" onClick={() => void logout()} className="gap-1.5">
             <LogOut className="h-3.5 w-3.5" />
             Sign out
-          </button>
+          </Button>
         </header>
 
-        <div className="mb-8 flex flex-wrap gap-2 border-b border-slate-200 pb-4">
-          {STEPS.map((label, i) => (
-            <button
-              key={label}
-              type="button"
-              onClick={() => i <= step && setStep(i)}
-              className={`rounded-full px-3 py-1 text-sm font-medium transition ${
-                i === step
-                  ? "bg-vendor-teal text-white"
-                  : i < step
-                    ? "bg-teal-50 text-vendor-teal-dark"
-                    : "bg-slate-100 text-slate-500"
-              }`}
-            >
-              {i + 1}. {label}
-            </button>
-          ))}
-        </div>
+        <WizardStepBar step={step} onStepClick={(i) => i <= step && setStep(i)} />
 
-        <div className="rounded-2xl bg-white p-8 shadow-card">
+        <Card className="border-border/50 p-6 shadow-elevated sm:p-8">
           {step === 0 && (
             <section className="space-y-5">
               <h2 className="text-lg font-semibold text-slate-900">Details</h2>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Owner Name *">
+                <FormField label="Owner Name *">
                   <input
-                    className="input"
+                    className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                     value={details.ownerName}
                     onChange={(e) => setDetails({ ...details, ownerName: e.target.value })}
                   />
-                </Field>
-                <Field label="Business Name *">
+                </FormField>
+                <FormField label="Business Name *">
                   <input
-                    className="input"
+                    className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                     value={details.businessName}
                     onChange={(e) => setDetails({ ...details, businessName: e.target.value })}
                   />
-                </Field>
-                <Field label="Email">
+                </FormField>
+                <FormField label="Email">
                   <input
                     type="email"
-                    className="input"
+                    className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                     value={details.email}
                     onChange={(e) => setDetails({ ...details, email: e.target.value })}
                   />
-                </Field>
-                <Field label="Mobile">
+                </FormField>
+                <FormField label="Mobile">
                   <input
-                    className="input"
+                    className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                     value={details.phone}
                     onChange={(e) => setDetails({ ...details, phone: e.target.value })}
                   />
-                </Field>
-                <Field label="Vendor Type *">
+                </FormField>
+                <FormField label="Vendor Type *">
                   <select
-                    className="input"
+                    className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                     value={vendorKind}
                     onChange={(e) => setVendorKind(e.target.value as VendorKindChoice)}
                   >
                     <option value="SERVICE">Service Vendor</option>
                     <option value="PRODUCT">Product Vendor</option>
                   </select>
-                </Field>
+                </FormField>
                 {vendorKind === "PRODUCT" ? (
-                  <Field label="Vendor Category">
+                  <FormField label="Vendor Category">
                     <input
-                      className="input"
+                      className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                       placeholder="e.g. groceries, electronics"
                       value={details.categorySlug}
                       onChange={(e) => setDetails({ ...details, categorySlug: e.target.value })}
                     />
-                  </Field>
+                  </FormField>
                 ) : (
-                  <Field label="Services">
+                  <FormField label="Services">
                     <input
-                      className="input"
+                      className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                       placeholder="e.g. salon, plumbing"
                       value={details.serviceName}
                       onChange={(e) => setDetails({ ...details, serviceName: e.target.value })}
                     />
-                  </Field>
+                  </FormField>
                 )}
               </div>
 
@@ -341,49 +330,49 @@ export default function VendorOnboardingPage() {
                   These details appear on customer tax invoice issued under vendor name.
                 </p>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="GSTIN (15 chars)">
+                  <FormField label="GSTIN (15 chars)">
                     <input
-                      className="input"
+                      className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                       maxLength={15}
                       value={details.gst}
                       onChange={(e) => setDetails({ ...details, gst: e.target.value })}
                     />
-                  </Field>
-                  <Field label="PAN (10 chars)">
+                  </FormField>
+                  <FormField label="PAN (10 chars)">
                     <input
-                      className="input"
+                      className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                       maxLength={10}
                       value={details.pan}
                       onChange={(e) => setDetails({ ...details, pan: e.target.value })}
                     />
-                  </Field>
-                  <Field label="State Name (place of supply)">
+                  </FormField>
+                  <FormField label="State Name (place of supply)">
                     <input
-                      className="input"
+                      className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                       value={details.stateName}
                       onChange={(e) => setDetails({ ...details, stateName: e.target.value })}
                     />
-                  </Field>
-                  <Field label="State Code (2 digits)">
+                  </FormField>
+                  <FormField label="State Code (2 digits)">
                     <input
-                      className="input"
+                      className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                       maxLength={2}
                       value={details.stateCode}
                       onChange={(e) => setDetails({ ...details, stateCode: e.target.value })}
                     />
-                  </Field>
-                  <Field
+                  </FormField>
+                  <FormField
                     label="Registered Shop Address (printed on invoice)"
                     className="sm:col-span-2"
                   >
                     <input
-                      className="input"
+                      className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                       value={details.registeredShopAddress}
                       onChange={(e) =>
                         setDetails({ ...details, registeredShopAddress: e.target.value })
                       }
                     />
-                  </Field>
+                  </FormField>
                 </div>
               </div>
             </section>
@@ -397,11 +386,11 @@ export default function VendorOnboardingPage() {
                 for admin verification.
               </p>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="GST Certificate">
+                <FormField label="GST Certificate">
                   <input
                     type="file"
                     accept="image/*,.pdf"
-                    className="input"
+                    className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                     onChange={(e) =>
                       setKyc((p) => ({
                         ...p,
@@ -414,12 +403,12 @@ export default function VendorOnboardingPage() {
                       Selected: {kyc.gstCertName}
                     </span>
                   ) : null}
-                </Field>
-                <Field label="PAN Card">
+                </FormField>
+                <FormField label="PAN Card">
                   <input
                     type="file"
                     accept="image/*,.pdf"
-                    className="input"
+                    className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                     onChange={(e) =>
                       setKyc((p) => ({
                         ...p,
@@ -432,7 +421,7 @@ export default function VendorOnboardingPage() {
                       Selected: {kyc.panCardName}
                     </span>
                   ) : null}
-                </Field>
+                </FormField>
               </div>
             </section>
           )}
@@ -444,36 +433,36 @@ export default function VendorOnboardingPage() {
                 Bank account where vendor settlements will be paid out.
               </p>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Bank Name">
+                <FormField label="Bank Name">
                   <input
-                    className="input"
+                    className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                     value={bank.bankName}
                     onChange={(e) => setBank({ ...bank, bankName: e.target.value })}
                   />
-                </Field>
-                <Field label="IFSC">
+                </FormField>
+                <FormField label="IFSC">
                   <input
-                    className="input"
+                    className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                     value={bank.ifscCode}
                     onChange={(e) => setBank({ ...bank, ifscCode: e.target.value })}
                   />
-                </Field>
-                <Field label="Account Holder">
+                </FormField>
+                <FormField label="Account Holder">
                   <input
-                    className="input"
+                    className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                     value={bank.accountHolderName}
                     onChange={(e) =>
                       setBank({ ...bank, accountHolderName: e.target.value })
                     }
                   />
-                </Field>
-                <Field label="Account Number">
+                </FormField>
+                <FormField label="Account Number">
                   <input
-                    className="input"
+                    className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
                     value={bank.accountNumber}
                     onChange={(e) => setBank({ ...bank, accountNumber: e.target.value })}
                   />
-                </Field>
+                </FormField>
               </div>
             </section>
           )}
@@ -510,41 +499,26 @@ export default function VendorOnboardingPage() {
             </section>
           )}
 
-          {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
+          {error ? <p className="mt-4 text-sm text-destructive">{error}</p> : null}
 
           <div className="mt-8 flex justify-between gap-4">
-            <button
-              type="button"
-              onClick={back}
-              disabled={step === 0 || loading}
-              className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
-            >
+            <Button type="button" variant="outline" onClick={back} disabled={step === 0 || loading}>
               Back
-            </button>
+            </Button>
             {step < STEPS.length - 1 ? (
-              <button
-                type="button"
-                onClick={next}
-                disabled={loading}
-                className="inline-flex items-center gap-2 rounded-xl bg-vendor-teal px-6 py-2.5 text-sm font-medium text-white hover:bg-vendor-teal-dark disabled:opacity-60"
-              >
+              <Button type="button" onClick={next} disabled={loading} className="gap-2">
                 Next
                 <ArrowRight className="h-4 w-4" />
-              </button>
+              </Button>
             ) : (
-              <button
-                type="button"
-                onClick={() => void submit()}
-                disabled={loading}
-                className="rounded-xl bg-vendor-teal px-6 py-2.5 text-sm font-medium text-white hover:bg-vendor-teal-dark disabled:opacity-60"
-              >
+              <Button type="button" onClick={() => void submit()} disabled={loading}>
                 {loading ? "Submitting…" : "Submit & continue"}
-              </button>
+              </Button>
             )}
           </div>
-        </div>
+        </Card>
       </div>
-    </div>
+    </AuthPageBackground>
   );
 }
 
@@ -562,30 +536,4 @@ function pickStringFromArray(v: unknown): string {
   if (!Array.isArray(v) || v.length === 0) return "";
   const first = v[0];
   return typeof first === "string" ? first : "";
-}
-
-function Field({
-  label,
-  children,
-  className,
-}: {
-  label: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <label className={`block ${className ?? ""}`}>
-      <span className="mb-1.5 block text-sm font-medium text-slate-700">{label}</span>
-      {children}
-    </label>
-  );
-}
-
-function ReviewRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-wrap gap-2 border-b border-slate-100 py-2">
-      <span className="min-w-[140px] font-medium text-slate-500">{label}</span>
-      <span>{value || "—"}</span>
-    </div>
-  );
 }

@@ -3,15 +3,28 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MoreVertical, Plus, Search, Upload } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   vendorCatalogApi,
   type CatalogProductRow,
 } from "@/lib/api/vendorCatalog";
-import { resolveMediaUrl } from "@/lib/media";
+import { cn } from "@/lib/utils";
 
 function parseMeta(v: unknown): Record<string, unknown> {
   if (!v || typeof v !== "object" || Array.isArray(v)) return {};
   return v as Record<string, unknown>;
+}
+
+function mediaUrl(u: string) {
+  if (!u) return "";
+  if (/^https?:\/\//i.test(u)) return u;
+  const base = (process.env.NEXT_PUBLIC_API_GATEWAY_URL || "").replace(/\/$/, "");
+  if (base) return `${base}${u.startsWith("/") ? u : `/${u}`}`;
+  return u;
 }
 
 function toCsv(rows: CatalogProductRow[]) {
@@ -89,21 +102,21 @@ export default function VendorProductsListPage() {
   }
 
   return (
-    <div className="min-w-0 space-y-8">
+    <div className="min-w-0 space-y-6">
       <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         {!loading ? (
-          <p className="text-sm font-medium text-slate-600 lg:shrink-0" aria-live="polite">
+          <p className="text-sm font-medium text-muted-foreground lg:shrink-0" aria-live="polite">
             {countLabel === 1 ? "1 product" : `${countLabel} products`}
           </p>
         ) : null}
         <div className="flex min-w-0 w-full flex-1 flex-wrap items-center gap-2 lg:max-w-[720px] lg:justify-end">
           <div className="relative min-w-0 flex-1 basis-[min(100%,280px)]">
             <Search
-              className="pointer-events-none absolute left-4 top-1/2 z-[1] h-4 w-4 -translate-y-1/2 text-slate-400"
+              className="pointer-events-none absolute left-3 top-1/2 z-[1] h-4 w-4 -translate-y-1/2 text-muted-foreground"
               aria-hidden
             />
-            <input
-              className="input w-full py-2.5 !pl-12 pr-3"
+            <Input
+              className="pl-9"
               placeholder="Search products..."
               value={q}
               onChange={(e) => setQ(e.target.value)}
@@ -111,7 +124,10 @@ export default function VendorProductsListPage() {
             />
           </div>
           <select
-            className="input min-w-[140px] shrink-0 py-2.5"
+            className={cn(
+              "flex h-10 min-w-[140px] shrink-0 rounded-xl border border-input bg-background px-3 py-2 text-sm",
+              "ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            )}
             value={filter}
             onChange={(e) => setFilter(e.target.value as "all" | "active" | "inactive")}
             aria-label="Product status"
@@ -120,104 +136,109 @@ export default function VendorProductsListPage() {
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </select>
-          <button
-            type="button"
-            onClick={exportCsv}
-            className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
-          >
+          <Button type="button" variant="outline" onClick={exportCsv} className="shrink-0 gap-2">
             <Upload className="h-4 w-4" />
             CSV
-          </button>
-          <Link
-            href="/dashboard/product/products/new"
-            className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-[#20a090] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#188a7c]"
-          >
-            <Plus className="h-4 w-4" />
-            Add Product
-          </Link>
+          </Button>
+          <Button asChild className="shrink-0 gap-2">
+            <Link href="/dashboard/product/products/new">
+              <Plus className="h-4 w-4" />
+              Add Product
+            </Link>
+          </Button>
         </div>
       </div>
 
-      {err ? <p className="text-sm text-red-600">{err}</p> : null}
+      {err ? (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
+          {err}
+        </div>
+      ) : null}
 
       {loading ? (
-        <p className="text-slate-600">Loading products…</p>
+        <ul className="space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-[120px] rounded-2xl" />
+          ))}
+        </ul>
       ) : items.length === 0 ? (
-        <div className="rounded-[14px] border border-slate-100 bg-white p-14 text-center text-slate-600 shadow-[0_2px_12px_rgba(15,23,42,0.06)]">
-          No products yet.{" "}
-          <Link href="/dashboard/product/products/new" className="font-semibold text-[#20a090] hover:underline">
-            Add your first product
-          </Link>
-        </div>
+        <Card className="p-14 text-center">
+          <p className="text-muted-foreground">
+            No products yet.{" "}
+            <Link href="/dashboard/product/products/new" className="font-semibold text-primary hover:underline">
+              Add your first product
+            </Link>
+          </p>
+        </Card>
       ) : (
         <ul className="space-y-3">
           {items.map((p) => {
             const meta = parseMeta(p.metadata);
             const sku = String(meta.sku || "—");
             const qty = meta.quantity != null ? String(meta.quantity) : "—";
-            const thumb = resolveMediaUrl(p.thumbnailUrl) || "";
+            const thumb = mediaUrl(p.thumbnailUrl || "");
             const pendingMod = String(p.moderationStatus || "approved").toLowerCase() === "pending";
             return (
-              <li
-                key={p.id}
-                className="relative flex items-center gap-4 rounded-[14px] border border-slate-100 bg-white p-4 shadow-[0_2px_12px_rgba(15,23,42,0.06)]"
-              >
-                <div className="relative h-[88px] w-[88px] shrink-0 overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200">
-                  {thumb ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={thumb} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-xs text-slate-400">No image</div>
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-base font-semibold text-slate-900">{p.name}</p>
-                    <span
-                      className={`rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${
-                        pendingMod ? "bg-amber-100 text-amber-900" : "bg-emerald-100 text-emerald-800"
-                      }`}
-                    >
-                      {pendingMod ? "Inactive" : "Active"}
-                    </span>
+              <li key={p.id}>
+                <Card className="relative flex items-center gap-4 p-4">
+                  <div className="relative h-[88px] w-[88px] shrink-0 overflow-hidden rounded-xl bg-muted ring-1 ring-border">
+                    {thumb ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={thumb} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+                        No image
+                      </div>
+                    )}
                   </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-x-8 gap-y-1 sm:max-w-xl">
-                    <span className="text-base font-semibold text-slate-900">
-                      ₹{Number(p.finalPrice || p.sellPrice || 0).toLocaleString("en-IN")}
-                    </span>
-                    <span className="text-sm text-slate-500">Stock: {qty}</span>
-                    <span className="text-sm text-slate-500">0 sold</span>
-                  </div>
-                  <p className="mt-1 text-xs text-slate-400">SKU {sku}</p>
-                </div>
-                <div className="relative ml-auto shrink-0 self-center">
-                  <button
-                    type="button"
-                    className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
-                    aria-label="Product actions"
-                    onClick={() => setMenuId((id) => (id === p.id ? null : p.id))}
-                  >
-                    <MoreVertical className="h-5 w-5" />
-                  </button>
-                  {menuId === p.id ? (
-                    <div className="absolute right-0 top-10 z-10 min-w-[140px] rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
-                      <Link
-                        href={`/dashboard/product/products/${encodeURIComponent(p.id)}/edit`}
-                        className="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                        onClick={() => setMenuId(null)}
-                      >
-                        Edit
-                      </Link>
-                      <button
-                        type="button"
-                        className="block w-full px-4 py-2 text-left text-sm text-red-700 hover:bg-red-50"
-                        onClick={() => void removeProduct(p.id)}
-                      >
-                        Delete
-                      </button>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-base font-semibold text-foreground">{p.name}</p>
+                      <Badge variant={pendingMod ? "warning" : "success"}>
+                        {pendingMod ? "Inactive" : "Active"}
+                      </Badge>
                     </div>
-                  ) : null}
-                </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-8 gap-y-1 sm:max-w-xl">
+                      <span className="text-base font-semibold text-foreground">
+                        ₹{Number(p.finalPrice || p.sellPrice || 0).toLocaleString("en-IN")}
+                      </span>
+                      <span className="text-sm text-muted-foreground">Stock: {qty}</span>
+                      <span className="text-sm text-muted-foreground">
+                        {(p.unitsSold ?? 0).toLocaleString("en-IN")} sold
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">SKU {sku}</p>
+                  </div>
+                  <div className="relative ml-auto shrink-0 self-center">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Product actions"
+                      onClick={() => setMenuId((id) => (id === p.id ? null : p.id))}
+                    >
+                      <MoreVertical className="h-5 w-5" />
+                    </Button>
+                    {menuId === p.id ? (
+                      <Card className="absolute right-0 top-10 z-10 min-w-[140px] py-1 shadow-lg">
+                        <Link
+                          href={`/dashboard/product/products/${encodeURIComponent(p.id)}/edit`}
+                          className="block px-4 py-2 text-sm text-foreground hover:bg-muted"
+                          onClick={() => setMenuId(null)}
+                        >
+                          Edit
+                        </Link>
+                        <button
+                          type="button"
+                          className="block w-full px-4 py-2 text-left text-sm text-destructive hover:bg-destructive/10"
+                          onClick={() => void removeProduct(p.id)}
+                        >
+                          Delete
+                        </button>
+                      </Card>
+                    ) : null}
+                  </div>
+                </Card>
               </li>
             );
           })}
