@@ -12,6 +12,7 @@ import {
 } from "@/lib/api/vendorOfferedServices";
 import { vendorUploadImage } from "@/lib/api/vendorUpload";
 import { formatInr } from "@/lib/vendor/profileDisplay";
+import { resolveMediaUrl } from "@/lib/media";
 
 const PRICE_TYPES: { value: PriceType; label: string }[] = [
   { value: "fixed", label: "Fixed" },
@@ -22,11 +23,7 @@ const PRICE_TYPES: { value: PriceType; label: string }[] = [
 const YES_NO = ["Yes", "No"] as const;
 
 function mediaUrl(u: string) {
-  if (!u) return "";
-  if (/^https?:\/\//i.test(u)) return u;
-  const base = (process.env.NEXT_PUBLIC_API_GATEWAY_URL || "").replace(/\/$/, "");
-  if (base) return `${base}${u.startsWith("/") ? u : `/${u}`}`;
-  return u;
+  return resolveMediaUrl(u) || "";
 }
 
 function metaStr(m: Record<string, unknown> | null | undefined, k: string): string {

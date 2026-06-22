@@ -22,6 +22,7 @@ import {
   orderLines,
   statusBadgeClass,
 } from "@/components/vendor/orders/OrderDetailModal";
+import { resolveMediaUrl } from "@/lib/media";
 
 type TabKey = "all" | "new" | "active" | "done";
 
@@ -258,13 +259,7 @@ export default function VendorProductOrdersPage() {
                 : typeof first.qty === "number"
                   ? first.qty
                   : 1);
-            const media = (u: string) => {
-              if (!u) return "";
-              if (/^https?:\/\//i.test(u)) return u;
-              const base = (process.env.NEXT_PUBLIC_API_GATEWAY_URL || "").replace(/\/$/, "");
-              if (base) return `${base}${u.startsWith("/") ? u : `/${u}`}`;
-              return u;
-            };
+            const media = (u: string) => resolveMediaUrl(u) || "";
 
             return (
               <li

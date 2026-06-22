@@ -23,6 +23,7 @@ import { getVendorMe, patchVendorProfile, type VendorProfile } from "@/lib/api/v
 import { vendorPlanApi, type VendorPlanInfoDto } from "@/lib/api/vendorPlan";
 import { vendorOrdersApi } from "@/lib/api/vendorOrders";
 import { vendorCatalogApi } from "@/lib/api/vendorCatalog";
+import { resolveMediaUrl } from "@/lib/media";
 import {
   formatInr,
   formatPercent,
@@ -234,8 +235,10 @@ export default function VendorBusinessProfileView() {
 
   const verified = String(me.kycStatus || "").toLowerCase() === "verified";
 
-  const thumb = String((me as { thumbnailUrl?: string | null }).thumbnailUrl || (me as { logoUrl?: string | null }).logoUrl || "");
-  const bannerUrl = String((me as { bannerUrl?: string | null }).bannerUrl || "");
+  const thumb = resolveMediaUrl(
+    (me as { thumbnailUrl?: string | null }).thumbnailUrl || (me as { logoUrl?: string | null }).logoUrl || "",
+  ) || "";
+  const bannerUrl = resolveMediaUrl((me as { bannerUrl?: string | null }).bannerUrl || "") || "";
 
   const catalogCountLabel = isProduct ? "Products" : "Services";
   let catalogCount = 0;
