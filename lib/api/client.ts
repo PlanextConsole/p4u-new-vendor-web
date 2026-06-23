@@ -252,7 +252,7 @@ async function request<T>(
     }
   }
 
-  if (!skipAuth && !skipAuthHeader && !tokenSnapshot().access) {
+  if (!skipAuthHeader && !tokenSnapshot().access) {
     forceLoginRedirect();
     throw { status: 401, message: "Session expired" } satisfies ApiErrorShape;
   }
