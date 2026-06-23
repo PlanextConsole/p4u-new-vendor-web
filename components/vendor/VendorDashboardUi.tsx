@@ -27,41 +27,49 @@ export type OrderRow = {
   customer: string;
   amount: string;
   status: string;
-  statusTone: "danger" | "success" | "info" | "neutral";
+  statusTone: "danger" | "success" | "info" | "neutral" | "warning" | "primary";
 };
 
 const statusClass: Record<OrderRow["statusTone"], string> = {
+  primary: "bg-primary/10 text-primary",
   danger: "bg-destructive/10 text-destructive",
   success: "bg-success/10 text-success",
   info: "bg-info/10 text-info",
+  warning: "bg-warning/10 text-warning",
   neutral: "bg-muted text-muted-foreground",
 };
 
+/** Planext4u dashboard content width — `max-w-5xl` centered column. */
+export function VendorDashboardLayout({ children }: { children: React.ReactNode }) {
+  return <div className="mx-auto w-full max-w-5xl space-y-6">{children}</div>;
+}
+
 export function VendorStatRow({ items }: { items: StatItem[] }) {
   return (
-    <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       {items.map((item) => (
-        <Card key={item.title} className="p-4 sm:p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-muted-foreground">{item.title}</p>
-              <p className="mt-2 text-xl font-bold tracking-tight text-foreground sm:text-2xl">{item.value}</p>
-              {item.hint ? (
-                <p
-                  className={cn(
-                    "mt-1 text-xs",
-                    item.hintPositive ? "font-medium text-success" : "text-muted-foreground",
-                  )}
-                >
-                  {item.hint}
-                </p>
-              ) : null}
-            </div>
-            <div className="rounded-xl bg-primary/10 p-2.5 text-primary">
-              <item.icon className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden />
-            </div>
+        <Card key={item.title} className="p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">{item.title}</span>
+            <item.icon className="h-4 w-4 text-muted-foreground" aria-hidden />
           </div>
+          <p className="text-xl font-bold text-foreground">{item.value}</p>
+          {item.hint ? (
+            <p className={cn("mt-0.5 text-xs", item.hintPositive ? "text-success" : "text-muted-foreground")}>
+              {item.hint}
+            </p>
+          ) : null}
         </Card>
+      ))}
+    </div>
+  );
+}
+
+export function VendorStatRowSkeleton() {
+  return (
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="h-24 animate-pulse rounded-xl bg-muted" />
       ))}
     </div>
   );
@@ -80,58 +88,43 @@ const defaultWeekRevenue = [
 export function VendorRevenueAreaChart({
   data = defaultWeekRevenue,
   gradientId = "vendorRevGrad",
+  className,
 }: {
   data?: { day: string; revenue: number }[];
   gradientId?: string;
+  className?: string;
 }) {
   const maxRev = data.length > 0 ? Math.max(...data.map((d) => d.revenue)) : 0;
-  const yMax = Math.max(4000, Math.ceil((maxRev * 1.12) / 1000) * 1000);
+  const yMax = Math.max(4000, Math.ceil((maxRev * 1.15) / 1000) * 1000);
 
   return (
-    <Card className="min-w-0 p-5 sm:p-6">
-      <h2 className="mb-4 text-sm font-semibold text-foreground sm:mb-6 sm:text-base">
-        This Week&apos;s Revenue
-      </h2>
-      <div className="h-[220px] w-full min-w-0 sm:h-[260px]">
+    <Card className={cn("min-w-0 p-5 lg:col-span-2", className)}>
+      <h3 className="mb-4 text-sm font-semibold text-foreground">This Week&apos;s Revenue</h3>
+      <div className="h-[220px] w-full min-w-0">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 8, right: 12, left: 4, bottom: 0 }}>
+          <AreaChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.32} />
+                <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
                 <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-            <XAxis
-              dataKey="day"
-              tick={{ fontSize: 12 }}
-              stroke="hsl(var(--muted-foreground))"
-              axisLine={false}
-              tickLine={false}
-            />
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+            <XAxis dataKey="day" tick={{ fontSize: 12 }} stroke="hsl(var(--muted-foreground))" />
             <YAxis
-              tickFormatter={(v) => (v >= 1000 ? `₹${v / 1000}k` : `₹${v}`)}
               tick={{ fontSize: 12 }}
               stroke="hsl(var(--muted-foreground))"
-              axisLine={false}
-              tickLine={false}
+              tickFormatter={(v) => `₹${(Number(v) / 1000).toFixed(0)}k`}
               domain={[0, yMax]}
-              width={44}
+              width={40}
             />
-            <Tooltip
-              formatter={(v: number) => [`₹${v.toLocaleString("en-IN")}`, "Revenue"]}
-              contentStyle={{
-                borderRadius: 12,
-                border: "1px solid hsl(var(--border))",
-                boxShadow: "var(--shadow-elevated)",
-              }}
-            />
+            <Tooltip formatter={(v: number) => [`₹${Number(v).toLocaleString("en-IN")}`, "Revenue"]} />
             <Area
               type="monotone"
               dataKey="revenue"
               stroke="hsl(var(--primary))"
-              strokeWidth={2}
               fill={`url(#${gradientId})`}
+              strokeWidth={2}
             />
           </AreaChart>
         </ResponsiveContainer>
@@ -144,51 +137,45 @@ export function VendorRecentOrdersCard({
   title = "Recent Orders",
   viewAllHref,
   orders,
+  className,
 }: {
   title?: string;
   viewAllHref: string;
   orders: OrderRow[];
+  className?: string;
 }) {
   return (
-    <Card className="flex min-w-0 flex-col p-5 sm:p-6">
-      <div className="mb-4 flex min-w-0 items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-foreground sm:text-base">{title}</h2>
-        <Link href={viewAllHref} className="text-xs font-semibold text-primary hover:underline sm:text-sm">
+    <Card className={cn("min-w-0 p-5", className)}>
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        <Link href={viewAllHref} className="text-xs text-primary hover:underline">
           View All
         </Link>
       </div>
       {orders.length === 0 ? (
-        <p className="flex flex-1 items-center justify-center py-10 text-center text-sm text-muted-foreground">
-          Nothing to show yet.
-        </p>
+        <p className="py-8 text-center text-sm text-muted-foreground">Nothing to show yet.</p>
       ) : (
-        <ul className="space-y-0">
+        <div className="space-y-3">
           {orders.map((o, i) => (
-            <li
-              key={`${o.id}-${i}`}
-              className={cn(
-                "flex items-start justify-between gap-3 py-3 text-sm",
-                i < orders.length - 1 && "border-b border-border/50",
-              )}
-            >
+            <div key={`${o.id}-${i}`} className="flex items-center justify-between">
               <div className="min-w-0">
-                <p className="font-semibold text-foreground">{o.id}</p>
-                <p className="truncate text-muted-foreground">{o.customer}</p>
+                <p className="text-xs font-medium text-foreground">{o.id}</p>
+                <p className="text-[11px] text-muted-foreground">{o.customer}</p>
               </div>
               <div className="shrink-0 text-right">
-                <p className="font-semibold text-foreground">{o.amount}</p>
+                <p className="text-xs font-bold text-foreground">{o.amount}</p>
                 <span
                   className={cn(
-                    "mt-1 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-medium capitalize sm:text-xs",
+                    "rounded-full px-1.5 py-0.5 text-[10px] capitalize",
                     statusClass[o.statusTone],
                   )}
                 >
                   {o.status}
                 </span>
               </div>
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
     </Card>
   );
@@ -198,15 +185,24 @@ export type QuickItem = { icon: LucideIcon; href: string; label: string };
 
 export function VendorQuickActionStrip({ items }: { items: QuickItem[] }) {
   return (
-    <div className="grid min-w-0 grid-cols-3 gap-3 sm:grid-cols-6">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
       {items.map(({ icon: Icon, href, label }) => (
         <Link key={href} href={href} title={label} aria-label={label}>
-          <Card className="flex aspect-square max-h-[104px] flex-col items-center justify-center gap-2 p-3 transition-colors hover:border-primary/30 hover:bg-primary/5">
-            <Icon className="h-7 w-7 text-primary sm:h-8 sm:w-8" aria-hidden />
-            <span className="hidden text-[10px] font-medium text-muted-foreground sm:block">{label}</span>
+          <Card className="p-4 text-center transition-colors hover:border-primary/30">
+            <Icon className="mx-auto mb-2 h-6 w-6 text-primary" aria-hidden />
+            <p className="text-xs font-medium text-foreground">{label}</p>
           </Card>
         </Link>
       ))}
+    </div>
+  );
+}
+
+export function VendorDashboardChartRowSkeleton() {
+  return (
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+      <div className="h-[280px] animate-pulse rounded-2xl bg-muted lg:col-span-2" />
+      <div className="h-[280px] animate-pulse rounded-2xl bg-muted" />
     </div>
   );
 }

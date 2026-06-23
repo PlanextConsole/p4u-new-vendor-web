@@ -3,11 +3,15 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MoreVertical, Plus, Search, Upload } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
+import {
+  VendorListEmpty,
+  VendorListLayout,
+  VendorListToolbar,
+  VendorStatusBadge,
+} from "@/components/vendor/VendorListUi";
 import {
   vendorCatalogApi,
   type CatalogProductRow,
@@ -49,10 +53,15 @@ export default function VendorProductsListPage() {
   const [items, setItems] = useState<CatalogProductRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [qInput, setQInput] = useState("");
   const [q, setQ] = useState("");
-  /** All | Active (admin-approved) | Inactive (pending approval). */
   const [filter, setFilter] = useState<"all" | "active" | "inactive">("all");
   const [menuId, setMenuId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const t = setTimeout(() => setQ(qInput), 300);
+    return () => clearTimeout(t);
+  }, [qInput]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -78,8 +87,6 @@ export default function VendorProductsListPage() {
     void load();
   }, [load]);
 
-  const countLabel = useMemo(() => items.length, [items]);
-
   function exportCsv() {
     const blob = new Blob([toCsv(items)], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -101,53 +108,52 @@ export default function VendorProductsListPage() {
     }
   }
 
+  const hasFilters = Boolean(qInput.trim() || filter !== "all");
+
   return (
-    <div className="min-w-0 space-y-6">
-      <div className="flex min-w-0 flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        {!loading ? (
-          <p className="text-sm font-medium text-muted-foreground lg:shrink-0" aria-live="polite">
-            {countLabel === 1 ? "1 product" : `${countLabel} products`}
-          </p>
-        ) : null}
-        <div className="flex min-w-0 w-full flex-1 flex-wrap items-center gap-2 lg:max-w-[720px] lg:justify-end">
-          <div className="relative min-w-0 flex-1 basis-[min(100%,280px)]">
-            <Search
-              className="pointer-events-none absolute left-3 top-1/2 z-[1] h-4 w-4 -translate-y-1/2 text-muted-foreground"
-              aria-hidden
-            />
-            <Input
-              className="pl-9"
-              placeholder="Search products..."
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && void load()}
-            />
-          </div>
-          <select
-            className={cn(
-              "flex h-10 min-w-[140px] shrink-0 rounded-xl border border-input bg-background px-3 py-2 text-sm",
-              "ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            )}
-            value={filter}
-            onChange={(e) => setFilter(e.target.value as "all" | "active" | "inactive")}
-            aria-label="Product status"
-          >
-            <option value="all">All</option>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </select>
-          <Button type="button" variant="outline" onClick={exportCsv} className="shrink-0 gap-2">
-            <Upload className="h-4 w-4" />
-            CSV
-          </Button>
-          <Button asChild className="shrink-0 gap-2">
-            <Link href="/dashboard/product/products/new">
-              <Plus className="h-4 w-4" />
-              Add Product
-            </Link>
-          </Button>
+    <VendorListLayout>
+      <VendorListToolbar>
+        <div className="relative min-w-[200px] flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+          <Input className="pl-9" placeholder="Search products..." value={qInput} onChange={(e) => setQInput(e.target.value)} />
         </div>
-      </div>
+        <select
+          className={cn(
+            "h-10 w-[120px] shrink-0 rounded-xl border border-input bg-background px-3 text-sm",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          )}
+          value={filter}
+          onChange={(e) => setFilter(e.target.value as "all" | "active" | "inactive")}
+          aria-label="Product status"
+        >
+          <option value="all">All</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+        {hasFilters ? (
+          <Button
+            type="button"
+            variant="ghost"
+            className="text-xs"
+            onClick={() => {
+              setQInput("");
+              setFilter("all");
+            }}
+          >
+            Clear
+          </Button>
+        ) : null}
+        <Button type="button" variant="outline" onClick={exportCsv} className="shrink-0 gap-2">
+          <Upload className="h-4 w-4" />
+          CSV
+        </Button>
+        <Button asChild className="shrink-0 gap-2">
+          <Link href="/dashboard/product/products/new">
+            <Plus className="h-4 w-4" />
+            Add Product
+          </Link>
+        </Button>
+      </VendorListToolbar>
 
       {err ? (
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
@@ -158,18 +164,13 @@ export default function VendorProductsListPage() {
       {loading ? (
         <ul className="space-y-3">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-[120px] rounded-2xl" />
+            <li key={i} className="h-20 animate-pulse rounded-xl bg-muted" />
           ))}
         </ul>
       ) : items.length === 0 ? (
-        <Card className="p-14 text-center">
-          <p className="text-muted-foreground">
-            No products yet.{" "}
-            <Link href="/dashboard/product/products/new" className="font-semibold text-primary hover:underline">
-              Add your first product
-            </Link>
-          </p>
-        </Card>
+        <VendorListEmpty
+          title={hasFilters ? "No products found. Try clearing filters." : "No products found. Click Add Product to create one."}
+        />
       ) : (
         <ul className="space-y-3">
           {items.map((p) => {
@@ -178,52 +179,45 @@ export default function VendorProductsListPage() {
             const qty = meta.quantity != null ? String(meta.quantity) : "—";
             const thumb = mediaUrl(p.thumbnailUrl || "");
             const pendingMod = String(p.moderationStatus || "approved").toLowerCase() === "pending";
+            const statusLabel = pendingMod ? "inactive" : "active";
             return (
               <li key={p.id}>
                 <Card className="relative flex items-center gap-4 p-4">
-                  <div className="relative h-[88px] w-[88px] shrink-0 overflow-hidden rounded-xl bg-muted ring-1 ring-border">
+                  <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-secondary/30">
                     {thumb ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={thumb} alt="" className="h-full w-full object-cover" />
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
-                        No image
-                      </div>
+                      <div className="flex h-full w-full items-center justify-center text-lg text-muted-foreground">📦</div>
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-base font-semibold text-foreground">{p.name}</p>
-                      <Badge variant={pendingMod ? "warning" : "success"}>
-                        {pendingMod ? "Inactive" : "Active"}
-                      </Badge>
+                      <p className="truncate text-sm font-medium text-foreground">{p.name}</p>
+                      <VendorStatusBadge status={statusLabel} kind="product" />
                     </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-x-8 gap-y-1 sm:max-w-xl">
-                      <span className="text-base font-semibold text-foreground">
-                        ₹{Number(p.finalPrice || p.sellPrice || 0).toLocaleString("en-IN")}
-                      </span>
-                      <span className="text-sm text-muted-foreground">Stock: {qty}</span>
-                      <span className="text-sm text-muted-foreground">
-                        {(p.unitsSold ?? 0).toLocaleString("en-IN")} sold
-                      </span>
-                    </div>
-                    <p className="mt-1 text-xs text-muted-foreground">SKU {sku}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      ₹{Number(p.finalPrice || p.sellPrice || 0).toLocaleString("en-IN")} · Stock: {qty} ·{" "}
+                      {(p.unitsSold ?? 0).toLocaleString("en-IN")} sold
+                    </p>
+                    <p className="text-[10px] text-muted-foreground">SKU {sku}</p>
                   </div>
-                  <div className="relative ml-auto shrink-0 self-center">
+                  <div className="relative ml-auto shrink-0">
                     <Button
                       type="button"
                       variant="ghost"
                       size="icon"
+                      className="h-8 w-8"
                       aria-label="Product actions"
                       onClick={() => setMenuId((id) => (id === p.id ? null : p.id))}
                     >
-                      <MoreVertical className="h-5 w-5" />
+                      <MoreVertical className="h-4 w-4" />
                     </Button>
                     {menuId === p.id ? (
-                      <Card className="absolute right-0 top-10 z-10 min-w-[140px] py-1 shadow-lg">
+                      <Card className="absolute right-0 top-9 z-10 min-w-[140px] py-1 shadow-lg">
                         <Link
                           href={`/dashboard/product/products/${encodeURIComponent(p.id)}/edit`}
-                          className="block px-4 py-2 text-sm text-foreground hover:bg-muted"
+                          className="block px-4 py-2 text-sm hover:bg-muted"
                           onClick={() => setMenuId(null)}
                         >
                           Edit
@@ -244,6 +238,6 @@ export default function VendorProductsListPage() {
           })}
         </ul>
       )}
-    </div>
+    </VendorListLayout>
   );
 }

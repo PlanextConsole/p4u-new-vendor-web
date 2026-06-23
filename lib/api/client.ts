@@ -135,7 +135,7 @@ async function refreshAccessTokenDeduped(): Promise<void> {
   await refreshInFlight;
 }
 
-async function ensureTokenFresh(): Promise<void> {
+export async function ensureTokenFresh(): Promise<void> {
   const { access, refresh } = tokenSnapshot();
   if (!access || !refresh) return;
   const expMs = decodeJwtExpMs(access);

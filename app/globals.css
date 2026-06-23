@@ -59,6 +59,12 @@
 
     --shadow-card: 0 1px 3px 0 hsl(215 60% 15% / 0.05), 0 1px 2px -1px hsl(215 60% 15% / 0.03);
     --shadow-elevated: 0 8px 16px -4px hsl(215 60% 15% / 0.08), 0 4px 6px -2px hsl(215 60% 15% / 0.04);
+
+    /* Vendor shell nav — Planext4u alignment */
+    --nav-active-bg: #e7f7f5;
+    --nav-active-text: #009e9a;
+    --nav-muted: #64748b;
+    --nav-pill-shadow: 0 4px 20px -2px hsl(180 100% 30% / 0.45), 0 0 10px 0 hsl(180 100% 30% / 0.2);
   }
 
   * {
@@ -78,5 +84,41 @@
 
   .input-with-icon {
     @apply pl-10;
+  }
+
+  .vendor-nav-link {
+    @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all;
+    color: var(--nav-muted);
+  }
+
+  .vendor-nav-link:hover {
+    @apply bg-secondary text-foreground;
+  }
+
+  .vendor-nav-link-active {
+    background-color: var(--nav-active-bg);
+    color: var(--nav-active-text);
+    @apply font-semibold shadow-sm;
+  }
+
+  .vendor-bottom-nav-pill {
+    box-shadow: var(--nav-pill-shadow);
+  }
+
+  .vendor-drawer-panel {
+    animation: vendor-drawer-in 0.32s ease-out;
+  }
+
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+@keyframes vendor-drawer-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
   }
 }

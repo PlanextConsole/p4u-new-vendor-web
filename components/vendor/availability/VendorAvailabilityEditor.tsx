@@ -11,6 +11,7 @@ import {
   type BookingAvailabilityDTO,
   type DayScheduleDTO,
 } from "@/lib/api/vendorBookingAvailability";
+import { VendorFormLayout } from "@/components/vendor/VendorListUi";
 
 const DAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
 
@@ -175,7 +176,7 @@ export function VendorAvailabilityEditor() {
   }
 
   return (
-    <div className="space-y-6">
+    <VendorFormLayout width="lg">
       {err ? <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">{err}</div> : null}
       {ok ? <div className="rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">{ok}</div> : null}
 
@@ -390,6 +391,6 @@ export function VendorAvailabilityEditor() {
           </ul>
         )}
       </div>
-    </div>
+    </VendorFormLayout>
   );
 }

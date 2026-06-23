@@ -97,6 +97,7 @@ export function orderToRecentRow(o: VendorCommerceOrder): OrderRow {
   let tone: OrderRow["statusTone"] = "neutral";
   if (st === "cancelled" || st === "refunded") tone = "danger";
   else if (st === "delivered" || st === "completed") tone = "success";
+  else if (st === "in_progress") tone = "warning";
   else if (NEW_STATUSES.has(st) || ACTIVE_STATUSES.has(st)) tone = "info";
   return {
     id: displayOrderRef(o),
@@ -124,7 +125,9 @@ function bookingCustomerLabel(b: VendorBookingRow): string {
 function bookingStatusTone(st: string): OrderRow["statusTone"] {
   const s = st.toLowerCase();
   if (s === "rejected" || s === "cancelled") return "danger";
-  if (s === "approved" || s === "completed") return "success";
+  if (s === "completed") return "success";
+  if (s === "approved") return "success";
+  if (s === "in_progress") return "warning";
   if (s === "pending") return "info";
   return "neutral";
 }

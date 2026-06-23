@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ConfirmationResult } from "firebase/auth";
 import { ArrowRight, CheckCircle2, ChevronDown, Loader2, Phone, Store } from "lucide-react";
 import { authApi } from "@/lib/api/auth";
-import { persistAuthSession } from "@/lib/authSession";
+import { hasAccessToken, persistAuthSession } from "@/lib/authSession";
 import { sendPhoneOtp, clearRecaptcha } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -85,6 +85,13 @@ export default function VendorLoginCard() {
   const [timer, setTimer] = useState(RESEND_S);
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
   const submitLock = useRef(false);
+
+  // Already signed in (valid token persisted) — skip the login screen on reopen / new tab / "/".
+  useEffect(() => {
+    if (hasAccessToken()) {
+      router.replace("/dashboard/product");
+    }
+  }, [router]);
 
   useEffect(() => {
     if (searchParams?.get("registered") === "1") {

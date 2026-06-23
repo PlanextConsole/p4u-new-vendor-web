@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { FileText, Shield, Upload, X } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { VendorFormLayout } from "@/components/vendor/VendorListUi";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -140,7 +140,7 @@ export default function VendorKycVerificationView() {
   const kycOverall = String(me.kycStatus || "").toLowerCase();
 
   return (
-    <div className="min-w-0 space-y-6">
+    <VendorFormLayout width="md">
       {readOnly ? (
         <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-foreground">
           Your application is still with admin. Document references from your signup appear below. To change them,{" "}
@@ -313,6 +313,6 @@ export default function VendorKycVerificationView() {
           </div>
         </div>
       ) : null}
-    </div>
+    </VendorFormLayout>
   );
 }

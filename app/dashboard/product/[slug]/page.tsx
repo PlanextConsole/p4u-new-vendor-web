@@ -1,14 +1,26 @@
-export default function ProductSectionPlaceholder({
-  params,
-}: {
-  params: { slug: string };
-}) {
+"use client";
+
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { VendorFormLayout } from "@/components/vendor/VendorListUi";
+
+export default function ProductSectionPage({ params }: { params: { slug: string } }) {
+  const title = params.slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
   return (
-    <div className="min-w-0 rounded-[14px] border border-slate-100 bg-white p-8 shadow-[0_2px_12px_rgba(15,23,42,0.06)] sm:p-10">
-      <p className="text-sm leading-relaxed text-slate-600">
-        This area will connect to catalog and orders next.{" "}
-        <span className="sr-only">Section: {params.slug.replace(/-/g, " ")}.</span>
-      </p>
-    </div>
+    <VendorFormLayout width="md">
+      <header className="flex items-center gap-3">
+        <Link href="/dashboard/product" className="rounded-lg p-1 hover:bg-muted">
+          <ArrowLeft className="h-5 w-5" />
+        </Link>
+        <h1 className="text-lg font-bold">{title}</h1>
+      </header>
+      <Card className="p-8 text-center">
+        <p className="text-sm text-muted-foreground">
+          This section is not available yet. Use the sidebar to manage products, orders, and settlements.
+        </p>
+      </Card>
+    </VendorFormLayout>
   );
 }

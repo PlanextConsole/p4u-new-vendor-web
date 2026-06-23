@@ -11,13 +11,15 @@ import {
   Star,
 } from "lucide-react";
 import {
+  VendorDashboardChartRowSkeleton,
+  VendorDashboardLayout,
   VendorQuickActionStrip,
   VendorRecentOrdersCard,
   VendorRevenueAreaChart,
   VendorStatRow,
+  VendorStatRowSkeleton,
   type StatItem,
 } from "@/components/vendor/VendorDashboardUi";
-import { Skeleton } from "@/components/ui/skeleton";
 import { vendorOrdersApi } from "@/lib/api/vendorOrders";
 import { vendorCatalogApi } from "@/lib/api/vendorCatalog";
 import { vendorRatingsApi } from "@/lib/api/vendorRatings";
@@ -79,17 +81,15 @@ export default function ProductVendorDashboardPage() {
     const pipeline = active + newCt;
     return [
       {
-        title: "Total revenue",
+        title: "Total Revenue",
         value: formatInr(revenue),
-        hint: `${orderTotal} order${orderTotal === 1 ? "" : "s"} on record`,
+        hint: `${orderTotal} orders`,
         hintPositive: true,
         icon: DollarSign,
       },
       {
-        title: "Active orders",
+        title: "Active Orders",
         value: String(pipeline),
-        hint: "In progress or awaiting fulfilment",
-        hintPositive: true,
         icon: ShoppingCart,
       },
       {
@@ -98,37 +98,31 @@ export default function ProductVendorDashboardPage() {
         icon: Package,
       },
       {
-        title: "Store rating",
+        title: "Rating",
         value: ratingSummary && ratingSummary.reviewCount > 0 ? String(ratingSummary.averageRating) : "—",
         hint:
           ratingSummary && ratingSummary.reviewCount > 0
-            ? `${ratingSummary.reviewCount} review${ratingSummary.reviewCount === 1 ? "" : "s"}`
-            : "No ratings yet",
+            ? `${ratingSummary.reviewCount} total orders`
+            : undefined,
+        hintPositive: ratingSummary != null && ratingSummary.reviewCount > 0,
         icon: Star,
       },
     ];
   }, [orders, orderTotal, productTotal, ratingSummary]);
 
-  const recentRows = useMemo(() => orders.slice(0, 5).map(orderToRecentRow), [orders]);
+  const recentRows = useMemo(() => orders.slice(0, 4).map(orderToRecentRow), [orders]);
 
   if (loading) {
     return (
-      <div className="min-w-0 space-y-6">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-28 rounded-2xl" />
-          ))}
-        </div>
-        <div className="grid gap-4 lg:grid-cols-5">
-          <Skeleton className="h-[300px] rounded-2xl lg:col-span-3" />
-          <Skeleton className="h-[300px] rounded-2xl lg:col-span-2" />
-        </div>
-      </div>
+      <VendorDashboardLayout>
+        <VendorStatRowSkeleton />
+        <VendorDashboardChartRowSkeleton />
+      </VendorDashboardLayout>
     );
   }
 
   return (
-    <div className="min-w-0 space-y-8">
+    <VendorDashboardLayout>
       {err ? (
         <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-foreground" role="status">
           {err}
@@ -137,27 +131,21 @@ export default function ProductVendorDashboardPage() {
 
       <VendorStatRow items={stats} />
 
-      <div className="grid min-w-0 gap-6 lg:grid-cols-5">
-        <div className="min-w-0 lg:col-span-3">
-          <VendorRevenueAreaChart data={weekRevenue} gradientId="prdDashRev" />
-        </div>
-        <div className="min-w-0 lg:col-span-2">
-          <VendorRecentOrdersCard viewAllHref="/dashboard/product/orders" orders={recentRows} />
-        </div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <VendorRevenueAreaChart data={weekRevenue} gradientId="prdDashRev" />
+        <VendorRecentOrdersCard viewAllHref="/dashboard/product/orders" orders={recentRows} />
       </div>
 
-      <section aria-label="Quick actions">
-        <VendorQuickActionStrip
-          items={[
-            { icon: Package, href: "/dashboard/product/products", label: "Products" },
-            { icon: ShoppingCart, href: "/dashboard/product/orders", label: "Orders" },
-            { icon: DollarSign, href: "/dashboard/product/settlements", label: "Settlements" },
-            { icon: History, href: "/dashboard/product/payments", label: "Payment History" },
-            { icon: CreditCard, href: "/dashboard/product/bank", label: "Bank Account" },
-            { icon: ShieldCheck, href: "/dashboard/product/kyc", label: "KYC Verification" },
-          ]}
-        />
-      </section>
-    </div>
+      <VendorQuickActionStrip
+        items={[
+          { icon: Package, href: "/dashboard/product/products", label: "Products" },
+          { icon: ShoppingCart, href: "/dashboard/product/orders", label: "Orders" },
+          { icon: DollarSign, href: "/dashboard/product/settlements", label: "Settlements" },
+          { icon: History, href: "/dashboard/product/payments", label: "Payments" },
+          { icon: CreditCard, href: "/dashboard/product/bank", label: "Bank A/C" },
+          { icon: ShieldCheck, href: "/dashboard/product/kyc", label: "KYC" },
+        ]}
+      />
+    </VendorDashboardLayout>
   );
 }

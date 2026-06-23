@@ -1,14 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  CheckCircle2,
-  Clock3,
-  Eye,
-  Package,
-  Pencil,
-  Truck,
-} from "lucide-react";
+import { CheckCircle2, Clock3, Eye, Package, Pencil, Truck } from "lucide-react";
 import type { VendorCommerceOrder } from "@/lib/api/vendorOrders";
 import { vendorOrdersApi } from "@/lib/api/vendorOrders";
 import { getVendorMe, type VendorProfile } from "@/lib/api/vendor";
@@ -20,12 +13,16 @@ import {
   metaRecord,
   orderLineThumbnailRaw,
   orderLines,
-  statusBadgeClass,
 } from "@/components/vendor/orders/OrderDetailModal";
+import {
+  VendorListEmpty,
+  VendorListLayout,
+  VendorListStatRow,
+  VendorListTabs,
+  VendorStatusBadge,
+} from "@/components/vendor/VendorListUi";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
 
 type TabKey = "all" | "new" | "active" | "done";
 
@@ -72,18 +69,17 @@ function formatListDate(iso?: string): string {
   return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 }
 
-type StatCard = {
-  label: string;
-  value: string;
-  icon: typeof Clock3;
-  iconClass: string;
-  valueClass?: string;
-};
+function mediaUrl(u: string) {
+  if (!u) return "";
+  if (/^https?:\/\//i.test(u)) return u;
+  const base = (process.env.NEXT_PUBLIC_API_GATEWAY_URL || "").replace(/\/$/, "");
+  if (base) return `${base}${u.startsWith("/") ? u : `/${u}`}`;
+  return u;
+}
 
 export default function VendorProductOrdersPage() {
   const [me, setMe] = useState<VendorProfile | null>(null);
   const [items, setItems] = useState<VendorCommerceOrder[]>([]);
-  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [tab, setTab] = useState<TabKey>("all");
@@ -99,7 +95,6 @@ export default function VendorProductOrdersPage() {
       ]);
       setMe(profile);
       setItems(list.items || []);
-      setTotal(list.total ?? list.items?.length ?? 0);
     } catch (e: unknown) {
       setErr(e && typeof e === "object" && "message" in e ? String((e as { message: string }).message) : "Failed to load orders");
     } finally {
@@ -132,35 +127,12 @@ export default function VendorProductOrdersPage() {
     return { today, pending, active, revenue };
   }, [items]);
 
-  const statCards: StatCard[] = useMemo(
+  const statCards = useMemo(
     () => [
-      {
-        label: "Today",
-        value: String(stats.today),
-        icon: Clock3,
-        iconClass: "bg-primary/10 text-primary",
-      },
-      {
-        label: "Pending",
-        value: String(stats.pending),
-        icon: Package,
-        iconClass: "bg-warning/10 text-warning",
-        valueClass: "text-warning",
-      },
-      {
-        label: "Active",
-        value: String(stats.active),
-        icon: Truck,
-        iconClass: "bg-info/10 text-info",
-        valueClass: "text-info",
-      },
-      {
-        label: "Revenue",
-        value: formatInr(stats.revenue),
-        icon: CheckCircle2,
-        iconClass: "bg-success/10 text-success",
-        valueClass: "text-success text-2xl",
-      },
+      { label: "Today", value: String(stats.today), icon: Clock3, iconClass: "text-primary" },
+      { label: "Pending", value: String(stats.pending), icon: Package, iconClass: "text-warning", valueClass: "text-warning" },
+      { label: "Active", value: String(stats.active), icon: Truck, iconClass: "text-info", valueClass: "text-info" },
+      { label: "Revenue", value: formatInr(stats.revenue), icon: CheckCircle2, iconClass: "text-success", valueClass: "text-success" },
     ],
     [stats],
   );
@@ -186,10 +158,6 @@ export default function VendorProductOrdersPage() {
     }
   }
 
-  function closeDetail() {
-    setDetail(null);
-  }
-
   function onOrderUpdated(updated: VendorCommerceOrder) {
     setItems((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
   }
@@ -200,72 +168,39 @@ export default function VendorProductOrdersPage() {
   };
 
   return (
-    <div className="min-w-0 space-y-6">
-      <div>
-        <p className="text-sm text-muted-foreground">
-          Manage and track your storefront orders.
-          {total > 0 ? (
-            <span className="ml-1 font-medium text-foreground" aria-live="polite">
-              ({total} {total === 1 ? "order" : "orders"} on file)
-            </span>
-          ) : null}
-        </p>
-      </div>
-
+    <VendorListLayout>
       {err ? (
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
           {err}
         </div>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {loading
-          ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-2xl" />)
-          : statCards.map((s) => (
-              <Card key={s.label} className="p-5">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">{s.label}</p>
-                    <p className={cn("mt-2 text-3xl font-bold tracking-tight text-foreground", s.valueClass)}>
-                      {s.value}
-                    </p>
-                  </div>
-                  <div className={cn("rounded-xl p-2.5", s.iconClass)}>
-                    <s.icon className="h-6 w-6" aria-hidden />
-                  </div>
-                </div>
-              </Card>
-            ))}
-      </div>
+      {loading ? (
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-20 animate-pulse rounded-xl bg-muted" />
+          ))}
+        </div>
+      ) : (
+        <VendorListStatRow items={statCards} />
+      )}
 
-      <div className="inline-flex flex-wrap gap-1 rounded-2xl border border-border bg-muted/50 p-1">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => setTab(t.key)}
-            className={cn(
-              "rounded-xl px-4 py-2.5 text-sm font-semibold transition",
-              tab === t.key
-                ? "bg-card text-foreground shadow-sm ring-1 ring-border"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <VendorListTabs tabs={tabs} active={tab} onChange={setTab} />
 
       {loading ? (
-        <ul className="space-y-4">
+        <ul className="space-y-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-44 rounded-2xl" />
+            <li key={i} className="h-24 animate-pulse rounded-xl bg-muted" />
           ))}
         </ul>
       ) : filtered.length === 0 ? (
-        <Card className="p-14 text-center text-muted-foreground">No orders in this view yet.</Card>
+        <VendorListEmpty
+          icon={Package}
+          title="No orders yet"
+          subtitle="Orders placed by customers will appear here"
+        />
       ) : (
-        <ul className="space-y-4">
+        <ul className="space-y-3">
           {filtered.map((o) => {
             const m = metaRecord(o.metadata);
             const lines = orderLines(m);
@@ -283,69 +218,49 @@ export default function VendorProductOrdersPage() {
                 : typeof first.qty === "number"
                   ? first.qty
                   : 1);
-            const media = (u: string) => {
-              if (!u) return "";
-              if (/^https?:\/\//i.test(u)) return u;
-              const base = (process.env.NEXT_PUBLIC_API_GATEWAY_URL || "").replace(/\/$/, "");
-              if (base) return `${base}${u.startsWith("/") ? u : `/${u}`}`;
-              return u;
-            };
 
             return (
               <li key={o.id}>
-                <Card className="p-5">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
+                <Card className="p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-mono text-sm font-semibold text-foreground sm:text-base">
-                          {displayOrderRef(o)}
-                        </span>
-                        <span
-                          className={cn(
-                            "rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize",
-                            statusBadgeClass(o.status),
-                          )}
-                        >
-                          {o.status.replace(/_/g, " ")}
-                        </span>
+                        <span className="font-mono text-xs font-semibold">{displayOrderRef(o)}</span>
+                        <VendorStatusBadge status={o.status} kind="order" />
                       </div>
-                      <p className="mt-2 text-sm text-muted-foreground">
+                      <p className="mt-1 text-xs text-muted-foreground">
                         {customerName(m)} · {formatListDate(o.createdAt)}
                       </p>
                     </div>
-                    <p className="text-lg font-bold text-foreground">{formatInr(o.totalAmount)}</p>
+                    <p className="text-sm font-bold">{formatInr(o.totalAmount)}</p>
                   </div>
 
-                  <div className="mt-4 flex items-center gap-3">
-                    <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-muted ring-1 ring-border">
+                  <div className="mt-3 flex items-center gap-2">
+                    <div className="h-8 w-8 shrink-0 overflow-hidden rounded bg-muted">
                       {thumb ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={media(String(thumb))} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center text-[10px] text-muted-foreground">
-                          No image
-                        </div>
-                      )}
+                        <img src={mediaUrl(String(thumb))} alt="" className="h-full w-full object-cover" />
+                      ) : null}
                     </div>
-                    <p className="min-w-0 flex-1 text-sm font-medium text-foreground sm:text-base">
+                    <p className="min-w-0 flex-1 text-xs font-medium">
                       {lines.length ? (
                         <>
                           {String(title)} x {qty}
                         </>
                       ) : (
-                        <span className="text-muted-foreground">No line items (metadata)</span>
+                        <span className="text-muted-foreground">No line items</span>
                       )}
                     </p>
                   </div>
 
-                  <div className="mt-5 flex flex-wrap gap-2">
-                    <Button type="button" variant="outline" onClick={() => openDetail(o)} className="gap-2">
-                      <Eye className="h-4 w-4" aria-hidden />
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button type="button" size="sm" variant="outline" className="h-8 gap-1 text-xs" onClick={() => openDetail(o)}>
+                      <Eye className="h-3.5 w-3.5" />
                       View
                     </Button>
                     {canUpdateStatus(o) ? (
-                      <Button type="button" onClick={() => openDetail(o)} className="gap-2">
-                        <Pencil className="h-4 w-4" aria-hidden />
+                      <Button type="button" size="sm" className="h-8 gap-1 text-xs" onClick={() => openDetail(o)}>
+                        <Pencil className="h-3.5 w-3.5" />
                         Update Status
                       </Button>
                     ) : null}
@@ -361,10 +276,10 @@ export default function VendorProductOrdersPage() {
         <OrderDetailModal
           order={detail}
           vendorDisplayName={vendorName}
-          onClose={closeDetail}
+          onClose={() => setDetail(null)}
           onUpdated={onOrderUpdated}
         />
       ) : null}
-    </div>
+    </VendorListLayout>
   );
 }

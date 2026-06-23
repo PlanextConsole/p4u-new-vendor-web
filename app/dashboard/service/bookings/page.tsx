@@ -5,19 +5,14 @@ import { CalendarCheck, CheckCircle2, Clock3 } from "lucide-react";
 import type { VendorBookingRow } from "@/lib/api/vendorBookings";
 import { vendorBookingsApi } from "@/lib/api/vendorBookings";
 import { vendorOfferedServicesApi } from "@/lib/api/vendorOfferedServices";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { cn } from "@/lib/utils";
-
-const PAGE_SIZE = 20;
-
-function bookingRef(id: string) {
-  const raw = String(id || "").trim();
-  if (!raw) return "—";
-  return `BKG-${raw.slice(0, 8).toUpperCase()}`;
-}
+import {
+  VendorListEmpty,
+  VendorListLayout,
+  VendorListStatRowCentered,
+  VendorStatusBadge,
+} from "@/components/vendor/VendorListUi";
 
 function formatBookingDate(ymd: string): string {
   if (!ymd) return "—";
@@ -26,47 +21,96 @@ function formatBookingDate(ymd: string): string {
   return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 }
 
-function customerLabel(row: VendorBookingRow): string {
-  const m = row.metadata;
-  if (m && typeof m === "object") {
-    const n =
-      (typeof m.customerName === "string" && m.customerName.trim()) ||
-      (typeof m.fullName === "string" && m.fullName.trim()) ||
-      (typeof m.customerDisplay === "string" && m.customerDisplay.trim());
-    if (n) return n;
-  }
-  const id = String(row.customerId || "").trim();
-  if (!id) return "—";
-  return `Customer · ${id.slice(0, 8)}…`;
+function formatInr(amount?: string | number | null): string {
+  const n = typeof amount === "string" ? parseFloat(amount) : Number(amount ?? 0);
+  return `₹${(Number.isNaN(n) ? 0 : n).toLocaleString("en-IN")}`;
 }
 
-function statusTone(status: string): "pending" | "progress" | "done" | "muted" {
+function serviceLabel(row: VendorBookingRow, names: Record<string, string>): string {
+  const meta = row.metadata;
+  if (meta && typeof meta === "object" && typeof meta.serviceName === "string" && meta.serviceName.trim()) {
+    return meta.serviceName.trim();
+  }
+  const sid = String(row.serviceId || "").trim();
+  if (!sid) return "General service";
+  return names[sid] || `${sid.slice(0, 8)}…`;
+}
+
+function sectionFor(status: string): "pending" | "active" | "done" | "other" {
   const s = status.toLowerCase();
-  if (s === "pending") return "pending";
-  if (s === "approved") return "progress";
-  if (s === "in_progress") return "progress";
-  if (s === "completed") return "done";
-  if (s === "rejected" || s === "cancelled") return "muted";
-  return "muted";
+  if (s === "pending" || s === "approved" || s === "confirmed") return "pending";
+  if (s === "in_progress") return "active";
+  if (s === "completed" || s === "cancelled" || s === "rejected") return "done";
+  return "other";
 }
 
-function badgeVariant(tone: ReturnType<typeof statusTone>): "warning" | "default" | "success" | "secondary" {
-  switch (tone) {
-    case "pending":
-      return "warning";
-    case "progress":
-      return "default";
-    case "done":
-      return "success";
-    default:
-      return "secondary";
-  }
+function BookingCard({
+  row,
+  serviceTitle,
+  busy,
+  onReview,
+}: {
+  row: VendorBookingRow;
+  serviceTitle: string;
+  busy: boolean;
+  onReview: (row: VendorBookingRow, decision: "approved" | "rejected" | "in_progress" | "completed") => void;
+}) {
+  const st = String(row.status || "pending").toLowerCase();
+  const notes = row.notes?.trim();
+
+  return (
+    <Card className="p-4">
+      <div className="mb-2 flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold">{serviceTitle}</p>
+          <p className="text-xs text-muted-foreground">
+            {formatBookingDate(row.bookingDate)} · {row.timeSlot || "—"}
+          </p>
+        </div>
+        <VendorStatusBadge status={st} kind="order" />
+      </div>
+
+      {notes ? <p className="mb-2 text-xs text-muted-foreground">Note: {notes}</p> : null}
+
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm font-bold">{formatInr(row.totalAmount)}</p>
+        <div className="flex flex-wrap justify-end gap-2">
+          {st === "pending" ? (
+            <>
+              <Button type="button" size="sm" className="h-7 text-xs" disabled={busy} onClick={() => onReview(row, "approved")}>
+                Accept
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs text-destructive"
+                disabled={busy}
+                onClick={() => onReview(row, "rejected")}
+              >
+                Reject
+              </Button>
+            </>
+          ) : null}
+          {st === "approved" ? (
+            <Button type="button" size="sm" className="h-7 gap-1 text-xs" disabled={busy} onClick={() => onReview(row, "in_progress")}>
+              <Clock3 className="h-3 w-3" />
+              Start
+            </Button>
+          ) : null}
+          {st === "in_progress" ? (
+            <Button type="button" size="sm" className="h-7 text-xs" disabled={busy} onClick={() => onReview(row, "completed")}>
+              Complete
+            </Button>
+          ) : null}
+        </div>
+      </div>
+    </Card>
+  );
 }
 
 export default function VendorServiceBookingsPage() {
   const [items, setItems] = useState<VendorBookingRow[]>([]);
-  const [total, setTotal] = useState(0);
-  const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [actionId, setActionId] = useState<string | null>(null);
@@ -80,9 +124,10 @@ export default function VendorServiceBookingsPage() {
         vendorBookingsApi.list({ status: "approved", limit: 1, offset: 0 }),
         vendorBookingsApi.list({ status: "completed", limit: 1, offset: 0 }),
       ]);
+      const inProgress = await vendorBookingsApi.list({ status: "in_progress", limit: 1, offset: 0 });
       setCounts({
-        pending: p.total ?? 0,
-        inProgress: a.total ?? 0,
+        pending: (p.total ?? 0) + (a.total ?? 0),
+        inProgress: inProgress.total ?? 0,
         completed: c.total ?? 0,
       });
     } catch {
@@ -104,21 +149,19 @@ export default function VendorServiceBookingsPage() {
     }
   }, []);
 
-  const loadTable = useCallback(async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setErr("");
     try {
-      const list = await vendorBookingsApi.list({ limit: PAGE_SIZE, offset });
+      const list = await vendorBookingsApi.list({ limit: 100, offset: 0 });
       setItems(list.items || []);
-      setTotal(list.total ?? 0);
     } catch (e: unknown) {
       setErr(e && typeof e === "object" && "message" in e ? String((e as { message: string }).message) : "Failed to load bookings");
       setItems([]);
-      setTotal(0);
     } finally {
       setLoading(false);
     }
-  }, [offset]);
+  }, []);
 
   useEffect(() => {
     void loadOfferingsMap();
@@ -126,19 +169,30 @@ export default function VendorServiceBookingsPage() {
   }, [loadOfferingsMap, refreshCounts]);
 
   useEffect(() => {
-    void loadTable();
-  }, [loadTable]);
+    void load();
+  }, [load]);
 
-  const serviceLabel = useCallback(
-    (serviceId: string | null) => {
-      if (!serviceId) return "General service";
-      return serviceNames[serviceId] || serviceId.slice(0, 8) + "…";
-    },
-    [serviceNames],
+  const grouped = useMemo(() => {
+    const pending: VendorBookingRow[] = [];
+    const active: VendorBookingRow[] = [];
+    const done: VendorBookingRow[] = [];
+    for (const row of items) {
+      const section = sectionFor(String(row.status || "pending"));
+      if (section === "pending") pending.push(row);
+      else if (section === "active") active.push(row);
+      else if (section === "done") done.push(row);
+    }
+    return { pending, active, done };
+  }, [items]);
+
+  const statCards = useMemo(
+    () => [
+      { label: "Pending", value: String(counts.pending), icon: Clock3, iconClass: "text-warning", valueClass: "text-warning" },
+      { label: "In Progress", value: String(counts.inProgress), icon: CalendarCheck, iconClass: "text-primary", valueClass: "text-primary" },
+      { label: "Completed", value: String(counts.completed), icon: CheckCircle2, iconClass: "text-success", valueClass: "text-success" },
+    ],
+    [counts],
   );
-
-  const canPrev = offset > 0;
-  const canNext = offset + PAGE_SIZE < total;
 
   async function review(row: VendorBookingRow, decision: "approved" | "rejected" | "completed" | "in_progress") {
     setActionId(row.id);
@@ -155,137 +209,84 @@ export default function VendorServiceBookingsPage() {
     }
   }
 
-  const summary = useMemo(
-    () => [
-      { key: "pending", label: "Pending", value: counts.pending, icon: Clock3, iconClass: "bg-warning/10 text-warning", valueClass: "text-warning" },
-      { key: "inProgress", label: "In progress", value: counts.inProgress, icon: CalendarCheck, iconClass: "bg-primary/10 text-primary", valueClass: "text-primary" },
-      { key: "completed", label: "Completed", value: counts.completed, icon: CheckCircle2, iconClass: "bg-success/10 text-success", valueClass: "text-success" },
-    ],
-    [counts],
-  );
+  const hasAny = grouped.pending.length + grouped.active.length + grouped.done.length > 0;
 
   return (
-    <div className="min-w-0 space-y-6">
-      <p className="text-sm text-muted-foreground">Review and manage customer service requests.</p>
-
-      <div className="grid gap-4 sm:grid-cols-3">
-        {summary.map(({ key, label, value, icon: Icon, iconClass, valueClass }) => (
-          <Card key={key} className="flex items-center gap-4 p-5">
-            <div className={cn("flex h-12 w-12 shrink-0 items-center justify-center rounded-xl", iconClass)}>
-              <Icon className="h-6 w-6" aria-hidden />
-            </div>
-            <div>
-              <p className={cn("text-3xl font-semibold tabular-nums leading-none", valueClass)}>{value}</p>
-              <p className="mt-1.5 text-sm font-medium text-muted-foreground">{label}</p>
-            </div>
-          </Card>
-        ))}
-      </div>
-
+    <VendorListLayout>
       {err ? (
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
           {err}
         </div>
       ) : null}
 
-      <Card className="overflow-hidden">
-        {loading ? (
-          <div className="space-y-3 p-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-12 rounded-lg" />
-            ))}
-          </div>
-        ) : items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-20 text-muted-foreground">
-            <CalendarCheck className="h-12 w-12 text-muted-foreground/40" aria-hidden />
-            <p className="text-sm font-medium">No service bookings yet</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-sm">
-              <thead className="border-b border-border bg-muted/50 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-3">Booking</th>
-                  <th className="px-4 py-3">Customer</th>
-                  <th className="px-4 py-3">Service</th>
-                  <th className="px-4 py-3">Date</th>
-                  <th className="px-4 py-3">Slot</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {items.map((row) => {
-                  const st = String(row.status || "pending").toLowerCase();
-                  const tone = statusTone(st);
-                  const busy = actionId === row.id;
-                  return (
-                    <tr key={row.id} className="hover:bg-muted/30">
-                      <td className="whitespace-nowrap px-4 py-3 font-semibold text-foreground">{bookingRef(row.id)}</td>
-                      <td className="max-w-[180px] truncate px-4 py-3 text-foreground">{customerLabel(row)}</td>
-                      <td className="max-w-[200px] truncate px-4 py-3 text-foreground">{serviceLabel(row.serviceId)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-foreground">{formatBookingDate(row.bookingDate)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-foreground">{row.timeSlot || "—"}</td>
-                      <td className="px-4 py-3">
-                        <Badge variant={badgeVariant(tone)} className="capitalize">
-                          {st}
-                        </Badge>
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right">
-                        {st === "pending" ? (
-                          <div className="flex justify-end gap-2">
-                            <Button type="button" size="sm" disabled={busy} onClick={() => void review(row, "approved")}>
-                              Approve
-                            </Button>
-                            <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void review(row, "rejected")}>
-                              Reject
-                            </Button>
-                          </div>
-                        ) : st === "approved" || st === "in_progress" ? (
-                          <div className="flex justify-end gap-2">
-                            {st === "approved" ? (
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                disabled={busy}
-                                onClick={() => void review(row, "in_progress")}
-                              >
-                                Start
-                              </Button>
-                            ) : null}
-                            <Button type="button" size="sm" disabled={busy} onClick={() => void review(row, "completed")}>
-                              Complete
-                            </Button>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+      {loading ? (
+        <div className="grid grid-cols-3 gap-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-20 animate-pulse rounded-xl bg-muted" />
+          ))}
+        </div>
+      ) : (
+        <VendorListStatRowCentered items={statCards} />
+      )}
 
-        {!loading && items.length > 0 ? (
-          <div className="flex items-center justify-between border-t border-border px-4 py-3 text-sm text-muted-foreground">
-            <span>
-              Showing {offset + 1}–{Math.min(offset + items.length, total)} of {total}
-            </span>
-            <div className="flex gap-2">
-              <Button type="button" size="sm" variant="outline" disabled={!canPrev} onClick={() => setOffset((o) => Math.max(0, o - PAGE_SIZE))}>
-                Previous
-              </Button>
-              <Button type="button" size="sm" variant="outline" disabled={!canNext} onClick={() => setOffset((o) => o + PAGE_SIZE)}>
-                Next
-              </Button>
-            </div>
-          </div>
-        ) : null}
-      </Card>
-    </div>
+      {loading ? (
+        <ul className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <li key={i} className="h-24 animate-pulse rounded-xl bg-muted" />
+          ))}
+        </ul>
+      ) : !hasAny ? (
+        <VendorListEmpty icon={CalendarCheck} title="No service bookings yet" />
+      ) : (
+        <div className="space-y-3">
+          {grouped.pending.length > 0 ? (
+            <>
+              <h3 className="text-sm font-semibold text-warning">
+                Pending / Confirmed ({grouped.pending.length})
+              </h3>
+              {grouped.pending.map((row) => (
+                <BookingCard
+                  key={row.id}
+                  row={row}
+                  serviceTitle={serviceLabel(row, serviceNames)}
+                  busy={actionId === row.id}
+                  onReview={(r, d) => void review(r, d)}
+                />
+              ))}
+            </>
+          ) : null}
+          {grouped.active.length > 0 ? (
+            <>
+              <h3 className="mt-4 text-sm font-semibold text-primary">In Progress ({grouped.active.length})</h3>
+              {grouped.active.map((row) => (
+                <BookingCard
+                  key={row.id}
+                  row={row}
+                  serviceTitle={serviceLabel(row, serviceNames)}
+                  busy={actionId === row.id}
+                  onReview={(r, d) => void review(r, d)}
+                />
+              ))}
+            </>
+          ) : null}
+          {grouped.done.length > 0 ? (
+            <>
+              <h3 className="mt-4 text-sm font-semibold text-success">
+                Completed / Cancelled ({grouped.done.length})
+              </h3>
+              {grouped.done.map((row) => (
+                <BookingCard
+                  key={row.id}
+                  row={row}
+                  serviceTitle={serviceLabel(row, serviceNames)}
+                  busy={actionId === row.id}
+                  onReview={(r, d) => void review(r, d)}
+                />
+              ))}
+            </>
+          ) : null}
+        </div>
+      )}
+    </VendorListLayout>
   );
 }

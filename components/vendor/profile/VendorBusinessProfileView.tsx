@@ -3,11 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   Check,
   Crown,
   CreditCard,
   ImagePlus,
+  KeyRound,
   Mail,
   MapPin,
   Navigation,
@@ -15,6 +17,7 @@ import {
   Phone,
   Save,
   Shield,
+  ShieldCheck,
   Store,
   X,
 } from "lucide-react";
@@ -31,6 +34,7 @@ import {
   shopAddressFromJson,
 } from "@/lib/vendor/profileDisplay";
 import { Skeleton } from "@/components/ui/skeleton";
+import { VendorFormLayout } from "@/components/vendor/VendorListUi";
 
 function errMessage(e: unknown): string {
   if (e && typeof e === "object" && "message" in e) return String((e as { message: string }).message);
@@ -61,6 +65,8 @@ function mergeAddressJson(
 }
 
 export default function VendorBusinessProfileView() {
+  const pathname = usePathname();
+  const dashRoot = pathname.includes("/dashboard/service") ? "/dashboard/service" : "/dashboard/product";
   const [me, setMe] = useState<VendorProfile | null>(null);
   const [planInfo, setPlanInfo] = useState<VendorPlanInfoDto | null>(null);
   const [productTotal, setProductTotal] = useState<number | null>(null);
@@ -248,7 +254,7 @@ export default function VendorBusinessProfileView() {
   else catalogCount = 0;
 
   return (
-    <div className="min-w-0 space-y-6">
+    <VendorFormLayout width="lg">
       {readOnly ? (
         <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-foreground">
           Profile is pending approval. Details below reflect your application.{" "}
@@ -393,6 +399,43 @@ export default function VendorBusinessProfileView() {
             <p className="mt-1 text-sm font-medium text-muted-foreground">Revenue</p>
           </div>
         </div>
+      </section>
+
+      {/* Security & account */}
+      <section className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+        <h2 className="text-lg font-bold text-foreground">Security &amp; Account</h2>
+        <ul className="mt-4 space-y-2">
+          <li>
+            <Link
+              href={`${dashRoot}/kyc`}
+              className="flex items-center justify-between rounded-xl border border-border px-4 py-3 text-sm font-medium hover:bg-muted"
+            >
+              <span className="flex items-center gap-2">
+                <ShieldCheck className="h-4 w-4 text-primary" />
+                KYC Verification
+              </span>
+              <span className="text-xs text-muted-foreground">{verified ? "Verified" : "Review"}</span>
+            </Link>
+          </li>
+          <li>
+            <Link
+              href={`${dashRoot}/change-password`}
+              className="flex items-center gap-2 rounded-xl border border-border px-4 py-3 text-sm font-medium hover:bg-muted"
+            >
+              <KeyRound className="h-4 w-4 text-primary" />
+              Change Password
+            </Link>
+          </li>
+          <li>
+            <Link
+              href={`${dashRoot}/account-control`}
+              className="flex items-center gap-2 rounded-xl border border-border px-4 py-3 text-sm font-medium hover:bg-muted"
+            >
+              <Shield className="h-4 w-4 text-primary" />
+              Account Ownership &amp; Control
+            </Link>
+          </li>
+        </ul>
       </section>
 
       {/* Edit business details */}
@@ -551,6 +594,6 @@ export default function VendorBusinessProfileView() {
           </div>
         </div>
       ) : null}
-    </div>
+    </VendorFormLayout>
   );
 }

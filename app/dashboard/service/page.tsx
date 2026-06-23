@@ -12,13 +12,15 @@ import {
   Wrench,
 } from "lucide-react";
 import {
+  VendorDashboardChartRowSkeleton,
+  VendorDashboardLayout,
   VendorQuickActionStrip,
   VendorRecentOrdersCard,
   VendorRevenueAreaChart,
   VendorStatRow,
+  VendorStatRowSkeleton,
   type StatItem,
 } from "@/components/vendor/VendorDashboardUi";
-import { Skeleton } from "@/components/ui/skeleton";
 import { vendorBookingsApi, type VendorBookingRow } from "@/lib/api/vendorBookings";
 import { vendorOfferedServicesApi } from "@/lib/api/vendorOfferedServices";
 import { vendorRatingsApi } from "@/lib/api/vendorRatings";
@@ -87,59 +89,53 @@ export default function ServiceVendorDashboardPage() {
     const revenue = sortedBookings.reduce((acc, b) => acc + bookingAmount(b), 0);
     return [
       {
-        title: "Booking revenue",
+        title: "Total Revenue",
         value: formatInr(revenue),
-        hint: `${bookingRecordTotal} booking${bookingRecordTotal === 1 ? "" : "s"} on record`,
+        hint: `${bookingRecordTotal} bookings`,
         hintPositive: true,
         icon: DollarSign,
       },
       {
-        title: "Pending confirmations",
+        title: "Active Orders",
         value: String(pendingTotal),
-        hint: "Awaiting your approve or reject",
+        hint: "Awaiting confirmation",
         hintPositive: true,
         icon: ShoppingCart,
       },
       {
-        title: "Listed services",
+        title: "Listed Services",
         value: String(serviceOfferingCount),
         icon: Wrench,
       },
       {
-        title: "Service rating",
+        title: "Rating",
         value: ratingSummary && ratingSummary.reviewCount > 0 ? String(ratingSummary.averageRating) : "—",
         hint:
           ratingSummary && ratingSummary.reviewCount > 0
-            ? `${ratingSummary.reviewCount} review${ratingSummary.reviewCount === 1 ? "" : "s"}`
-            : "No ratings yet",
+            ? `${ratingSummary.reviewCount} reviews`
+            : undefined,
+        hintPositive: ratingSummary != null && ratingSummary.reviewCount > 0,
         icon: Star,
       },
     ];
   }, [sortedBookings, bookingRecordTotal, pendingTotal, serviceOfferingCount, ratingSummary]);
 
   const recentRows = useMemo(
-    () => sortedBookings.slice(0, 5).map(bookingToRecentRow),
+    () => sortedBookings.slice(0, 4).map(bookingToRecentRow),
     [sortedBookings],
   );
 
   if (loading) {
     return (
-      <div className="min-w-0 space-y-6">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-28 rounded-2xl" />
-          ))}
-        </div>
-        <div className="grid gap-4 lg:grid-cols-5">
-          <Skeleton className="h-[300px] rounded-2xl lg:col-span-3" />
-          <Skeleton className="h-[300px] rounded-2xl lg:col-span-2" />
-        </div>
-      </div>
+      <VendorDashboardLayout>
+        <VendorStatRowSkeleton />
+        <VendorDashboardChartRowSkeleton />
+      </VendorDashboardLayout>
     );
   }
 
   return (
-    <div className="min-w-0 space-y-8">
+    <VendorDashboardLayout>
       {err ? (
         <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-foreground" role="status">
           {err}
@@ -148,31 +144,25 @@ export default function ServiceVendorDashboardPage() {
 
       <VendorStatRow items={stats} />
 
-      <div className="grid min-w-0 gap-6 lg:grid-cols-5">
-        <div className="min-w-0 lg:col-span-3">
-          <VendorRevenueAreaChart data={weekRevenue} gradientId="svcDashRev" />
-        </div>
-        <div className="min-w-0 lg:col-span-2">
-          <VendorRecentOrdersCard
-            title="Recent bookings"
-            viewAllHref="/dashboard/service/bookings"
-            orders={recentRows}
-          />
-        </div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <VendorRevenueAreaChart data={weekRevenue} gradientId="svcDashRev" />
+        <VendorRecentOrdersCard
+          title="Recent Bookings"
+          viewAllHref="/dashboard/service/bookings"
+          orders={recentRows}
+        />
       </div>
 
-      <section aria-label="Quick actions">
-        <VendorQuickActionStrip
-          items={[
-            { icon: Wrench, href: "/dashboard/service/services", label: "Services" },
-            { icon: CalendarClock, href: "/dashboard/service/availability", label: "Availability" },
-            { icon: CalendarCheck, href: "/dashboard/service/bookings", label: "Bookings" },
-            { icon: DollarSign, href: "/dashboard/service/settlements", label: "Settlements" },
-            { icon: History, href: "/dashboard/service/payments", label: "Payment History" },
-            { icon: CreditCard, href: "/dashboard/service/bank", label: "Bank Account" },
-          ]}
-        />
-      </section>
-    </div>
+      <VendorQuickActionStrip
+        items={[
+          { icon: Wrench, href: "/dashboard/service/services", label: "Services" },
+          { icon: CalendarClock, href: "/dashboard/service/availability", label: "Availability" },
+          { icon: CalendarCheck, href: "/dashboard/service/bookings", label: "Bookings" },
+          { icon: DollarSign, href: "/dashboard/service/settlements", label: "Settlements" },
+          { icon: History, href: "/dashboard/service/payments", label: "Payments" },
+          { icon: CreditCard, href: "/dashboard/service/bank", label: "Bank A/C" },
+        ]}
+      />
+    </VendorDashboardLayout>
   );
 }

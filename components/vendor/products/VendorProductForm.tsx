@@ -11,6 +11,10 @@ import {
   type TaxConfigurationRow,
 } from "@/lib/api/vendorCatalog";
 import { vendorUploadImage } from "@/lib/api/vendorUpload";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { VendorFormLayout } from "@/components/vendor/VendorListUi";
+import { cn } from "@/lib/utils";
 
 function parseMeta(v: unknown): Record<string, unknown> {
   if (!v || typeof v !== "object" || Array.isArray(v)) return {};
@@ -62,7 +66,7 @@ function resolvePublicAssetUrl(u: string) {
   return u;
 }
 
-type TabKey = "general" | "pricing" | "attributes";
+type TabKey = "general" | "pricing" | "attributes" | "seo";
 
 export function VendorProductForm({
   mode,
@@ -109,6 +113,9 @@ export function VendorProductForm({
   const [thumbUploading, setThumbUploading] = useState(false);
   const [moderationStatus, setModerationStatus] = useState<string>("approved");
   const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string[]>>({});
+  const [slug, setSlug] = useState("");
+  const [metaTitle, setMetaTitle] = useState("");
+  const [metaDescription, setMetaDescription] = useState("");
 
   const rootCategories = useMemo(
     () => categories.filter((c) => c.parentId == null),
@@ -162,6 +169,9 @@ export function VendorProductForm({
     setSpecPackSize(String(meta.specPackSize || ""));
     setThumbnailUrl(row.thumbnailUrl || "");
     setModerationStatus(String((row as CatalogProductRow).moderationStatus || "approved"));
+    setSlug(String(meta.slug || meta.seoSlug || ""));
+    setMetaTitle(String(meta.metaTitle || meta.meta_title || ""));
+    setMetaDescription(String(meta.metaDescription || meta.meta_description || ""));
   }, []);
 
   useEffect(() => {
@@ -295,6 +305,9 @@ export function VendorProductForm({
           specVolume: specVolume.trim() || null,
           specPackSize: specPackSize.trim() || null,
           productAttributes: selectedAttributes,
+          slug: slug.trim() || null,
+          metaTitle: metaTitle.trim() || null,
+          metaDescription: metaDescription.trim() || null,
         },
       };
       if (mode === "create") {
@@ -313,13 +326,12 @@ export function VendorProductForm({
 
   if (loading) {
     return (
-      <div className="rounded-[14px] border border-slate-100 bg-white p-10 text-center text-slate-600 shadow-sm">
-        Loading form…
-      </div>
+      <Card className="p-10 text-center text-muted-foreground">Loading form…</Card>
     );
   }
 
   return (
+    <VendorFormLayout width="lg">
     <form onSubmit={submit} className="space-y-6">
       {err ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{err}</div>
@@ -333,26 +345,28 @@ export function VendorProductForm({
       ) : null}
 
       {mode === "edit" && productId ? (
-        <p className="text-sm text-slate-500">
-          Product ref: <span className="font-mono font-medium text-slate-800">PRD-{productId.slice(-6)}</span>
+        <p className="text-sm text-muted-foreground">
+          Product ref: <span className="font-mono font-medium text-foreground">PRD-{productId.slice(-6)}</span>
         </p>
       ) : null}
 
-      <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-slate-50 p-1">
+      <div className="flex flex-wrap gap-2 rounded-xl border border-border bg-muted/40 p-1">
         {(
           [
             ["general", "General"],
             ["pricing", "Pricing"],
             ["attributes", "Attributes"],
+            ["seo", "SEO"],
           ] as const
         ).map(([k, label]) => (
           <button
             key={k}
             type="button"
             onClick={() => setTab(k)}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-              tab === k ? "bg-white text-[#20a090] shadow-sm" : "text-slate-600 hover:text-slate-900"
-            }`}
+            className={cn(
+              "rounded-lg px-4 py-2 text-sm font-medium transition",
+              tab === k ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground",
+            )}
           >
             {label}
           </button>
@@ -584,9 +598,9 @@ export function VendorProductForm({
       )}
 
       {tab === "attributes" && (
-        <div className="rounded-[14px] border border-slate-100 bg-white p-6 shadow-sm">
+        <Card className="p-6">
           {attributeDefs.length === 0 ? (
-            <p className="text-sm text-slate-500">No active product attributes.</p>
+            <p className="text-sm text-muted-foreground">No active product attributes.</p>
           ) : (
             <div className="space-y-6">
               {attributeDefs.map((attr) => {
@@ -594,7 +608,7 @@ export function VendorProductForm({
                 const selected = Array.isArray(selectedAttributes[attr.name]) ? selectedAttributes[attr.name] : [];
                 return (
                   <div key={attr.id}>
-                    <p className="mb-2 text-sm font-semibold text-slate-800">{attr.name}</p>
+                    <p className="mb-2 text-sm font-semibold text-foreground">{attr.name}</p>
                     {attr.type === "select" ? (
                       <div className="flex flex-wrap gap-2">
                         {values.map((opt) => {
@@ -605,15 +619,16 @@ export function VendorProductForm({
                               key={opt}
                               type="button"
                               onClick={() => toggleSelectAttribute(attr.name, opt)}
-                              className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition ${
+                              className={cn(
+                                "inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition",
                                 active
-                                  ? "border-[#20a090] bg-[#20a090]/10 text-teal-900"
-                                  : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
-                              }`}
+                                  ? "border-primary bg-primary/10 text-primary"
+                                  : "border-border bg-card text-foreground hover:border-primary/40",
+                              )}
                             >
                               {hex ? (
                                 <span
-                                  className="h-4 w-4 rounded-full border border-slate-200"
+                                  className="h-4 w-4 rounded-full border border-border"
                                   style={{ backgroundColor: hex }}
                                 />
                               ) : null}
@@ -623,8 +638,8 @@ export function VendorProductForm({
                         })}
                       </div>
                     ) : (
-                      <input
-                        className="input w-full max-w-md"
+                      <Input
+                        className="max-w-md"
                         type={attr.type === "number" ? "number" : "text"}
                         value={selected[0] || ""}
                         onChange={(e) => setScalarAttribute(attr.name, e.target.value)}
@@ -636,21 +651,46 @@ export function VendorProductForm({
               })}
             </div>
           )}
-        </div>
+        </Card>
+      )}
+
+      {tab === "seo" && (
+        <Card className="space-y-4 p-6">
+          <p className="text-sm text-muted-foreground">Optional fields for search and sharing. Leave blank to auto-generate from the title.</p>
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-medium text-foreground">URL slug</span>
+            <Input value={slug} onChange={(e) => setSlug(e.target.value)} placeholder="my-product-name" className="h-11 rounded-xl" />
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-medium text-foreground">Meta title</span>
+            <Input value={metaTitle} onChange={(e) => setMetaTitle(e.target.value)} placeholder="SEO page title" className="h-11 rounded-xl" />
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-sm font-medium text-foreground">Meta description</span>
+            <textarea
+              className="min-h-[88px] w-full rounded-xl border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              value={metaDescription}
+              onChange={(e) => setMetaDescription(e.target.value)}
+              rows={3}
+              placeholder="Short description for search engines"
+            />
+          </label>
+        </Card>
       )}
 
       <div className="flex flex-wrap justify-end gap-3">
-        <Link href="/dashboard/product/products" className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+        <Link href="/dashboard/product/products" className="rounded-xl border border-border px-5 py-2.5 text-sm font-medium hover:bg-muted">
           Cancel
         </Link>
         <button
           type="submit"
           disabled={saving}
-          className="rounded-xl bg-[#20a090] px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#188a7c] disabled:opacity-60"
+          className="rounded-xl bg-primary px-6 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90 disabled:opacity-60"
         >
           {saving ? "Saving…" : mode === "create" ? "Create product" : "Save changes"}
         </button>
       </div>
     </form>
+    </VendorFormLayout>
   );
 }
