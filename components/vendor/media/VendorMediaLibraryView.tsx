@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FolderPlus, ImageIcon, Search, Trash2, Upload } from "lucide-react";
 import { vendorMediaApi, type VendorMediaAsset, type VendorMediaFolder } from "@/lib/api/vendorMedia";
+import { resolveMediaUrl } from "@/lib/media";
 
 type FileFilter = "all" | "images" | "documents";
 
@@ -270,7 +271,7 @@ export default function VendorMediaLibraryView() {
                   <div className="relative aspect-[4/3] bg-muted">
                     {isImageMime(f.mimeType) ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={f.url} alt="" className="h-full w-full object-cover" />
+                      <img src={resolveMediaUrl(f.url) || f.url} alt="" className="h-full w-full object-cover" />
                     ) : (
                       <div className="flex h-full w-full flex-col items-center justify-center gap-1 p-3 text-center">
                         <FileTextGlyph />
@@ -278,7 +279,7 @@ export default function VendorMediaLibraryView() {
                       </div>
                     )}
                     <a
-                      href={f.url}
+                      href={resolveMediaUrl(f.url) || f.url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="absolute inset-0 bg-black/0 transition group-hover:bg-black/10"

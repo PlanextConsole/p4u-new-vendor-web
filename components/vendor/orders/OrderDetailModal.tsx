@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Building2, Package, Pencil, ShoppingCart, User, X } from "lucide-react";
 import type { VendorCommerceOrder } from "@/lib/api/vendorOrders";
 import { vendorOrdersApi } from "@/lib/api/vendorOrders";
+import { resolveMediaUrl } from "@/lib/media";
 
 const FLOW = [
   "placed",
@@ -108,11 +109,7 @@ export function orderLineThumbnailRaw(line: Record<string, unknown>): string {
 }
 
 function mediaUrl(u: string) {
-  if (!u) return "";
-  if (/^https?:\/\//i.test(u)) return u;
-  const base = (process.env.NEXT_PUBLIC_API_GATEWAY_URL || "").replace(/\/$/, "");
-  if (base) return `${base}${u.startsWith("/") ? u : `/${u}`}`;
-  return u;
+  return resolveMediaUrl(u) || u;
 }
 
 function filledSegments(statusRaw: string): number {

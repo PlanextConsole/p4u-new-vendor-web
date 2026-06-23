@@ -23,6 +23,7 @@ import {
 } from "@/components/vendor/VendorListUi";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { resolveMediaUrl } from "@/lib/media";
 
 type TabKey = "all" | "new" | "active" | "done";
 
@@ -70,11 +71,7 @@ function formatListDate(iso?: string): string {
 }
 
 function mediaUrl(u: string) {
-  if (!u) return "";
-  if (/^https?:\/\//i.test(u)) return u;
-  const base = (process.env.NEXT_PUBLIC_API_GATEWAY_URL || "").replace(/\/$/, "");
-  if (base) return `${base}${u.startsWith("/") ? u : `/${u}`}`;
-  return u;
+  return resolveMediaUrl(u) || u;
 }
 
 export default function VendorProductOrdersPage() {

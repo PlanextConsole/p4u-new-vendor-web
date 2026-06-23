@@ -12,7 +12,9 @@ const nextConfig = {
     const dest = String(gatewayTarget).replace(/\/$/, "");
     return [
       { source: "/api/:path*", destination: `${dest}/api/:path*` },
+      { source: "/uploads/:path*", destination: `${dest}/uploads/:path*` },
       { source: "/vendor-uploads/:path*", destination: `${dest}/vendor-uploads/:path*` },
+      { source: "/socio-uploads/:path*", destination: `${dest}/socio-uploads/:path*` },
     ];
   },
 };

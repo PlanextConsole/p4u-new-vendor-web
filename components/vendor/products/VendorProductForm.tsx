@@ -15,6 +15,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { VendorFormLayout } from "@/components/vendor/VendorListUi";
 import { cn } from "@/lib/utils";
+import { resolveMediaUrl } from "@/lib/media";
 
 function parseMeta(v: unknown): Record<string, unknown> {
   if (!v || typeof v !== "object" || Array.isArray(v)) return {};
@@ -59,11 +60,7 @@ function splitLabelAndHex(value: string) {
 }
 
 function resolvePublicAssetUrl(u: string) {
-  if (!u) return "";
-  if (/^https?:\/\//i.test(u)) return u;
-  const base = (process.env.NEXT_PUBLIC_API_GATEWAY_URL || "").replace(/\/$/, "");
-  if (base) return `${base}${u.startsWith("/") ? u : `/${u}`}`;
-  return u;
+  return resolveMediaUrl(u) || u;
 }
 
 type TabKey = "general" | "pricing" | "attributes" | "seo";

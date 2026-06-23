@@ -17,6 +17,7 @@ import {
   type CatalogProductRow,
 } from "@/lib/api/vendorCatalog";
 import { cn } from "@/lib/utils";
+import { resolveMediaUrl } from "@/lib/media";
 
 function parseMeta(v: unknown): Record<string, unknown> {
   if (!v || typeof v !== "object" || Array.isArray(v)) return {};
@@ -24,11 +25,7 @@ function parseMeta(v: unknown): Record<string, unknown> {
 }
 
 function mediaUrl(u: string) {
-  if (!u) return "";
-  if (/^https?:\/\//i.test(u)) return u;
-  const base = (process.env.NEXT_PUBLIC_API_GATEWAY_URL || "").replace(/\/$/, "");
-  if (base) return `${base}${u.startsWith("/") ? u : `/${u}`}`;
-  return u;
+  return resolveMediaUrl(u) || u;
 }
 
 function toCsv(rows: CatalogProductRow[]) {

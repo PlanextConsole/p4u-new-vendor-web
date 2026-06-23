@@ -35,6 +35,7 @@ import {
 } from "@/lib/vendor/profileDisplay";
 import { Skeleton } from "@/components/ui/skeleton";
 import { VendorFormLayout } from "@/components/vendor/VendorListUi";
+import { resolveMediaUrl } from "@/lib/media";
 
 function errMessage(e: unknown): string {
   if (e && typeof e === "object" && "message" in e) return String((e as { message: string }).message);
@@ -244,8 +245,8 @@ export default function VendorBusinessProfileView() {
 
   const verified = String(me.kycStatus || "").toLowerCase() === "verified";
 
-  const thumb = String((me as { thumbnailUrl?: string | null }).thumbnailUrl || (me as { logoUrl?: string | null }).logoUrl || "");
-  const bannerUrl = String((me as { bannerUrl?: string | null }).bannerUrl || "");
+  const thumb = resolveMediaUrl(String((me as { thumbnailUrl?: string | null }).thumbnailUrl || (me as { logoUrl?: string | null }).logoUrl || "")) || "";
+  const bannerUrl = resolveMediaUrl(String((me as { bannerUrl?: string | null }).bannerUrl || "")) || "";
 
   const catalogCountLabel = isProduct ? "Products" : "Services";
   let catalogCount = 0;

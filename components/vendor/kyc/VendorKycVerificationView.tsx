@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getVendorMe, patchVendorProfile, type VendorProfile } from "@/lib/api/vendor";
 import { vendorUploadDocument } from "@/lib/api/vendorDocuments";
 import { KYC_DOC_META, isKycDocSubmitted, kycDocViewUrl, type KycDocKind } from "@/lib/vendor/kycDocuments";
+import { resolveMediaUrl } from "@/lib/media";
 
 function errMessage(e: unknown): string {
   if (e && typeof e === "object" && "message" in e) return String((e as { message: string }).message);
@@ -216,7 +217,7 @@ export default function VendorKycVerificationView() {
               {submitted && viewUrl ? (
                 <p className="mt-3 text-sm">
                   <a
-                    href={viewUrl}
+                    href={resolveMediaUrl(viewUrl) || viewUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="font-semibold text-primary underline hover:text-[#115e59]"
