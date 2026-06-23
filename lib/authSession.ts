@@ -1,9 +1,10 @@
-import { VENDOR_AUTH, VENDOR_TOKEN_EVENT } from "@/lib/storageKeys";
+import { resetRefreshSessionState } from "@/lib/api/client";
 import { authApi, type LoginResponse } from "@/lib/api/auth";
+import { VENDOR_AUTH, VENDOR_TOKEN_EVENT, clearVendorAuthStorage } from "@/lib/storageKeys";
 import { signOutVendorFirebase } from "@/lib/firebase";
-
 export function persistAuthSession(res: LoginResponse, username: string) {
   if (typeof window === "undefined") return;
+  resetRefreshSessionState();
   localStorage.setItem(VENDOR_AUTH.access, res.accessToken);
   localStorage.setItem(VENDOR_AUTH.refresh, res.refreshToken);
   localStorage.setItem(VENDOR_AUTH.expiresIn, String(res.expiresIn));
@@ -12,12 +13,7 @@ export function persistAuthSession(res: LoginResponse, username: string) {
 }
 
 export function clearAuthSession() {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem(VENDOR_AUTH.access);
-  localStorage.removeItem(VENDOR_AUTH.refresh);
-  localStorage.removeItem(VENDOR_AUTH.expiresIn);
-  localStorage.removeItem(VENDOR_AUTH.username);
-  window.dispatchEvent(new CustomEvent(VENDOR_TOKEN_EVENT));
+  clearVendorAuthStorage();
 }
 
 /**

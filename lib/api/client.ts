@@ -4,7 +4,7 @@
  * If `NEXT_PUBLIC_API_GATEWAY_URL` is unset, requests use same-origin `/api/...` and
  * `next.config.js` rewrites proxy to the gateway (avoids CORS / mixed-origin issues).
  */
-import { VENDOR_AUTH, VENDOR_TOKEN_EVENT } from "@/lib/storageKeys";
+import { VENDOR_AUTH, VENDOR_TOKEN_EVENT, clearVendorAuthStorage } from "@/lib/storageKeys";
 
 /** Empty string = same-origin `/api` (see rewrites in next.config.js). */
 const BASE_URL = (process.env.NEXT_PUBLIC_API_GATEWAY_URL ?? "").replace(/\/$/, "");
@@ -51,6 +51,57 @@ function decodeJwtExpMs(token: string): number | null {
 }
 
 let refreshInFlight: Promise<void> | null = null;
+/** After any failed refresh, block further attempts until the user logs in again. */
+let refreshSessionDead = false;
+/** Pause refresh after rate-limit to avoid hammering the server. */
+let refreshBlockedUntil = 0;
+
+/** Call after a successful login so background refresh can run again. */
+export function resetRefreshSessionState() {
+  refreshSessionDead = false;
+  refreshBlockedUntil = 0;
+  refreshInFlight = null;
+}
+
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const part = token.split(".")[1];
+    if (!part) return null;
+    const b64 = part.replace(/-/g, "+").replace(/_/g, "/");
+    return JSON.parse(atob(b64)) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+function apiTargetIsProduction(): boolean {
+  if (/planext4u\.com/i.test(BASE_URL)) return true;
+  if (typeof window !== "undefined") {
+    return /planext4u\.com/i.test(window.location.hostname);
+  }
+  return false;
+}
+
+/** Dev Keycloak tokens cannot be refreshed against production API. */
+function refreshTokenEnvMismatch(refresh: string): boolean {
+  const payload = decodeJwtPayload(refresh);
+  const iss = typeof payload?.iss === "string" ? payload.iss : "";
+  const tokenIsLocal = /localhost|127\.0\.0\.1/i.test(iss);
+  return apiTargetIsProduction() && tokenIsLocal;
+}
+
+function forceLoginRedirect() {
+  refreshSessionDead = true;
+  refreshBlockedUntil = Date.now() + 300_000;
+  clearVendorAuthStorage();
+  if (typeof window !== "undefined") {
+    const path = window.location.pathname;
+    const onAuthScreen = path === "/login" || path === "/" || path === "/register";
+    if (!onAuthScreen) {
+      window.location.assign("/");
+    }
+  }
+}
 
 function tokenSnapshot() {
   if (typeof window === "undefined")
@@ -91,12 +142,29 @@ function extractHttpErrorMessage(
 }
 
 async function refreshAccessToken(): Promise<void> {
+  if (refreshSessionDead) {
+    throw { status: 401, message: "Session expired" } satisfies ApiErrorShape;
+  }
+  if (Date.now() < refreshBlockedUntil) {
+    throw { status: 429, message: "Refresh paused. Please sign in again." } satisfies ApiErrorShape;
+  }
   const { refresh } = tokenSnapshot();
-  if (!refresh) throw new Error("No refresh token");
-  const url = `${BASE_URL}/api/auth/public/refresh?refreshToken=${encodeURIComponent(refresh)}`;
+  if (!refresh) {
+    forceLoginRedirect();
+    throw { status: 401, message: "No refresh token" } satisfies ApiErrorShape;
+  }
+  if (refreshTokenEnvMismatch(refresh)) {
+    forceLoginRedirect();
+    throw {
+      status: 401,
+      message: "Session was created on local dev and cannot be used on production. Please sign in again.",
+    } satisfies ApiErrorShape;
+  }
+  const url = `${BASE_URL}/api/auth/public/refresh`;
   const res = await fetch(url, {
     method: "POST",
-    headers: { Accept: "application/json" },
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ refreshToken: refresh }),
   });
   const rawText = await res.text();
   let data: Record<string, unknown> | null = null;
@@ -107,6 +175,11 @@ async function refreshAccessToken(): Promise<void> {
   }
   if (!res.ok) {
     const msg = data?.message != null ? String(data.message) : extractHttpErrorMessage(res.status, res.statusText, data, rawText);
+    refreshSessionDead = true;
+    if (res.status === 429) {
+      refreshBlockedUntil = Date.now() + 300_000;
+    }
+    forceLoginRedirect();
     const err: ApiErrorShape = {
       status: res.status,
       message: typeof msg === "string" && msg.trim() ? msg : "Refresh failed",
@@ -114,6 +187,8 @@ async function refreshAccessToken(): Promise<void> {
     };
     throw err;
   }
+  refreshSessionDead = false;
+  refreshBlockedUntil = 0;
   const accessToken = data?.accessToken ?? data?.access_token;
   const refreshToken = data?.refreshToken ?? data?.refresh_token;
   const expiresIn = data?.expiresIn ?? data?.expires_in;
@@ -138,14 +213,11 @@ async function refreshAccessTokenDeduped(): Promise<void> {
 export async function ensureTokenFresh(): Promise<void> {
   const { access, refresh } = tokenSnapshot();
   if (!access || !refresh) return;
+  if (refreshSessionDead || Date.now() < refreshBlockedUntil) return;
   const expMs = decodeJwtExpMs(access);
   /** Refresh a bit before expiry; wide window avoids hammering Keycloak on every request. */
   if (expMs != null && expMs - Date.now() > 300_000) return;
-  try {
-    await refreshAccessTokenDeduped();
-  } catch {
-    /* caller may still retry with current access; 401 path will attempt refresh again */
-  }
+  await refreshAccessTokenDeduped();
 }
 
 function parseJsonBody(rawText: string, status: number): unknown {
@@ -174,8 +246,15 @@ async function request<T>(
     try {
       await ensureTokenFresh();
     } catch {
-      /* continue */
+      if (!tokenSnapshot().access) {
+        throw { status: 401, message: "Session expired" } satisfies ApiErrorShape;
+      }
     }
+  }
+
+  if (!skipAuth && !skipAuthHeader && !tokenSnapshot().access) {
+    forceLoginRedirect();
+    throw { status: 401, message: "Session expired" } satisfies ApiErrorShape;
   }
 
   const isFormData =
@@ -215,7 +294,11 @@ async function request<T>(
         await refreshAccessTokenDeduped();
         return request<T>(path, options, { ...internal, retry401: true });
       } catch {
-        /* fallthrough */
+        forceLoginRedirect();
+        throw {
+          status: 401,
+          message: "Session expired",
+        } satisfies ApiErrorShape;
       }
     }
     const envelopeError =

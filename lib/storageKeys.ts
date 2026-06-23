@@ -7,3 +7,13 @@ export const VENDOR_AUTH = {
 } as const;
 
 export const VENDOR_TOKEN_EVENT = "p4u-vendor-token-updated";
+
+/** Clear stored vendor tokens without calling logout API (safe from api client). */
+export function clearVendorAuthStorage() {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(VENDOR_AUTH.access);
+  localStorage.removeItem(VENDOR_AUTH.refresh);
+  localStorage.removeItem(VENDOR_AUTH.expiresIn);
+  localStorage.removeItem(VENDOR_AUTH.username);
+  window.dispatchEvent(new CustomEvent(VENDOR_TOKEN_EVENT));
+}

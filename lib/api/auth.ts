@@ -87,8 +87,8 @@ export const authApi = {
 
   refreshToken(refreshToken: string) {
     return apiClient.postInternal<LoginResponse>(
-      `${BASE}/public/refresh?refreshToken=${encodeURIComponent(refreshToken)}`,
-      undefined,
+      `${BASE}/public/refresh`,
+      { refreshToken },
       { skipAuthHeader: true, skipAuthRefresh: true },
     );
   },

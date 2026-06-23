@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { VENDOR_AUTH, VENDOR_TOKEN_EVENT } from "@/lib/storageKeys";
 import { ensureTokenFresh } from "@/lib/api/client";
+import { VENDOR_AUTH, VENDOR_TOKEN_EVENT } from "@/lib/storageKeys";
 
 function decodeJwtExpMs(token: string): number | null {
   try {
@@ -16,47 +16,62 @@ function decodeJwtExpMs(token: string): number | null {
   }
 }
 
+function hasStoredSession(): boolean {
+  return Boolean(
+    localStorage.getItem(VENDOR_AUTH.access) && localStorage.getItem(VENDOR_AUTH.refresh),
+  );
+}
+
+function nextRefreshDelayMs(): number {
+  const token = localStorage.getItem(VENDOR_AUTH.access);
+  if (!token) return 60_000;
+  const exp = decodeJwtExpMs(token);
+  const now = Date.now();
+  if (exp != null) {
+    let delayMs = exp - now - 45_000;
+    if (delayMs < 5_000) delayMs = Math.max(5_000, exp - now - 5_000);
+    if (exp - now < 90_000) delayMs = Math.max(30_000, exp - now - 5_000);
+    return delayMs;
+  }
+  const fallback = Number(localStorage.getItem(VENDOR_AUTH.expiresIn) || "300");
+  return Math.max((fallback - 45) * 1000, 30_000);
+}
+
 /** Keeps vendor Keycloak tokens fresh across page loads and idle tabs. */
 export default function VendorSessionProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
-    const timerRef = { current: null as ReturnType<typeof setTimeout> | null };
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let cancelled = false;
 
-    const scheduleRefresh = (): ReturnType<typeof setTimeout> | null => {
-      const token = localStorage.getItem(VENDOR_AUTH.access);
-      const refresh = localStorage.getItem(VENDOR_AUTH.refresh);
-      if (!token || !refresh) return null;
+    const runRefresh = async () => {
+      if (cancelled || !hasStoredSession()) return;
 
-      const exp = decodeJwtExpMs(token);
-      const now = Date.now();
-      let delayMs: number;
-      if (exp != null) {
-        delayMs = exp - now - 45_000;
-        if (delayMs < 5_000) delayMs = Math.max(0, exp - now - 5_000);
-        if (exp - now < 90_000) delayMs = 0;
-      } else {
-        const fallback = Number(localStorage.getItem(VENDOR_AUTH.expiresIn) || "300");
-        delayMs = Math.max((fallback - 45) * 1000, 10_000);
+      let nextDelay = nextRefreshDelayMs();
+      try {
+        await ensureTokenFresh();
+      } catch {
+        if (!hasStoredSession()) return;
+        nextDelay = Math.max(nextDelay, 120_000);
       }
 
-      return setTimeout(() => {
-        void ensureTokenFresh();
-        const next = scheduleRefresh();
-        if (next) timerRef.current = next;
-      }, delayMs);
+      if (cancelled || !hasStoredSession()) return;
+      timeoutId = setTimeout(() => {
+        void runRefresh();
+      }, nextDelay);
     };
 
-    const onTokenUpdate = () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = scheduleRefresh();
+    const restart = () => {
+      if (timeoutId != null) clearTimeout(timeoutId);
+      if (!hasStoredSession()) return;
+      void runRefresh();
     };
 
-    // Restore + refresh the session as soon as the app mounts (F5, reopen, new tab).
-    void ensureTokenFresh();
-    onTokenUpdate();
-    window.addEventListener(VENDOR_TOKEN_EVENT, onTokenUpdate);
+    restart();
+    window.addEventListener(VENDOR_TOKEN_EVENT, restart);
     return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      window.removeEventListener(VENDOR_TOKEN_EVENT, onTokenUpdate);
+      cancelled = true;
+      if (timeoutId != null) clearTimeout(timeoutId);
+      window.removeEventListener(VENDOR_TOKEN_EVENT, restart);
     };
   }, []);
 
