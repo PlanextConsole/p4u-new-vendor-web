@@ -65,33 +65,6 @@ export function resetRefreshSessionState() {
   refreshInFlight = null;
 }
 
-function decodeJwtPayload(token: string): Record<string, unknown> | null {
-  try {
-    const part = token.split(".")[1];
-    if (!part) return null;
-    const b64 = part.replace(/-/g, "+").replace(/_/g, "/");
-    return JSON.parse(atob(b64)) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
-
-function apiTargetIsProduction(): boolean {
-  if (/planext4u\.com/i.test(BASE_URL)) return true;
-  if (typeof window !== "undefined") {
-    return /planext4u\.com/i.test(window.location.hostname);
-  }
-  return false;
-}
-
-/** Dev Keycloak tokens cannot be refreshed against production API. */
-function refreshTokenEnvMismatch(refresh: string): boolean {
-  const payload = decodeJwtPayload(refresh);
-  const iss = typeof payload?.iss === "string" ? payload.iss : "";
-  const tokenIsLocal = /localhost|127\.0\.0\.1/i.test(iss);
-  return apiTargetIsProduction() && tokenIsLocal;
-}
-
 function forceLoginRedirect() {
   refreshSessionDead = true;
   refreshBlockedUntil = Date.now() + 300_000;
@@ -155,13 +128,12 @@ async function refreshAccessToken(): Promise<void> {
     forceLoginRedirect();
     throw { status: 401, message: "No refresh token" } satisfies ApiErrorShape;
   }
-  if (refreshTokenEnvMismatch(refresh)) {
-    forceLoginRedirect();
-    throw {
-      status: 401,
-      message: "Session was created on local dev and cannot be used on production. Please sign in again.",
-    } satisfies ApiErrorShape;
-  }
+  // NOTE: We intentionally do NOT pre-judge tokens by issuer host. This
+  // deployment's Keycloak issues tokens with iss=http://localhost:8180/...
+  // even in production (see deploy/backend-jwt.production.snippet), so a
+  // "localhost issuer on a planext4u.com target" is normal, not a dev/prod
+  // mismatch. A genuinely unusable refresh token is still caught below by the
+  // server's !res.ok response, which triggers forceLoginRedirect().
   const url = `${BASE_URL}/api/auth/public/refresh`;
   const res = await fetch(url, {
     method: "POST",
