@@ -30,7 +30,7 @@ import {
   User,
   Wrench,
 } from "lucide-react";
-import { getStoredUsername, hasAccessToken, signOutVendorCompletely } from "@/lib/authSession";
+import { getStoredUsername, hasValidAccessToken, signOutVendorCompletely } from "@/lib/authSession";
 import { getVendorMe, type VendorProfile } from "@/lib/api/vendor";
 import { Skeleton } from "@/components/ui/skeleton";
 import { VendorNotificationBell } from "@/components/vendor/VendorNotificationBell";
@@ -48,7 +48,7 @@ export default function VendorPortalShell({ children }: { children: React.ReactN
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
-    if (!hasAccessToken()) {
+    if (!hasValidAccessToken()) {
       router.replace("/");
       return;
     }
@@ -58,8 +58,15 @@ export default function VendorPortalShell({ children }: { children: React.ReactN
         const profile = await getVendorMe();
         if (cancelled) return;
         setMe(profile);
-      } catch {
-        if (!cancelled) router.replace("/onboarding");
+      } catch (e: unknown) {
+        if (cancelled) return;
+        const status =
+          e && typeof e === "object" && "status" in e ? Number((e as { status?: number }).status) : NaN;
+        if (status === 401) {
+          router.replace("/");
+          return;
+        }
+        router.replace("/onboarding");
       }
     })();
     return () => {

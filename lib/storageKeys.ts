@@ -4,6 +4,7 @@ export const VENDOR_AUTH = {
   refresh: "p4u_vendor_refresh_token",
   expiresIn: "p4u_vendor_token_expires_in",
   username: "p4u_vendor_username",
+  vendorType: "p4u_vendor_type",
 } as const;
 
 export const VENDOR_TOKEN_EVENT = "p4u-vendor-token-updated";
@@ -15,5 +16,6 @@ export function clearVendorAuthStorage() {
   localStorage.removeItem(VENDOR_AUTH.refresh);
   localStorage.removeItem(VENDOR_AUTH.expiresIn);
   localStorage.removeItem(VENDOR_AUTH.username);
+  localStorage.removeItem(VENDOR_AUTH.vendorType);
   window.dispatchEvent(new CustomEvent(VENDOR_TOKEN_EVENT));
 }

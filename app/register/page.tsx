@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { ConfirmationResult } from "firebase/auth";
-import { ArrowLeft, ArrowRight, Loader2, Store } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, Store } from "lucide-react";
 import { authApi } from "@/lib/api/auth";
-import { clearAuthSession, persistAuthSession } from "@/lib/authSession";
+import { clearAuthSession, dashboardPathForVendorType, persistAuthSession } from "@/lib/authSession";
 import { clearRecaptcha, sendPhoneOtp, signOutVendorFirebase } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -70,6 +70,7 @@ export default function RegisterPage() {
   const [step, setStep] = useState(0);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [registrationSuccess, setRegistrationSuccess] = useState(false);
 
   const [vendorKind, setVendorKind] = useState<VendorKindChoice>("PRODUCT");
 
@@ -275,13 +276,12 @@ export default function RegisterPage() {
       const idToken = await cred.user.getIdToken();
       const payload = buildPayload(idToken);
       const auth = await authApi.registerVendorByPhone(payload);
-      persistAuthSession(auth, toE164(details.phone));
-      // Land in the type-specific dashboard. The portal shell will show a
-      // "Profile pending verification" banner because catalog_vendors.status
-      // is `pending` until admin approves.
-      router.replace(
-        vendorKind === "SERVICE" ? "/dashboard/service" : "/dashboard/product",
-      );
+      persistAuthSession(auth, toE164(details.phone), vendorKind);
+      setRegistrationSuccess(true);
+      setOtpOpen(false);
+      setTimeout(() => {
+        router.replace(dashboardPathForVendorType(vendorKind));
+      }, 3200);
     } catch (err: unknown) {
       const code = String((err as { code?: string })?.code || "");
       const status =
@@ -385,6 +385,17 @@ export default function RegisterPage() {
 
         <WizardStepBar step={step} onStepClick={(i) => i <= step && setStep(i)} />
 
+        {registrationSuccess ? (
+          <Card className="border-success/30 bg-success/5 p-8 text-center shadow-elevated">
+            <CheckCircle2 className="mx-auto mb-4 h-14 w-14 text-success" />
+            <h2 className="text-xl font-bold text-foreground">Vendor registration successful</h2>
+            <p className="mx-auto mt-3 max-w-md text-sm text-muted-foreground">
+              Your application has been submitted and is pending admin approval. You can use the
+              dashboard now while verification is in progress.
+            </p>
+            <p className="mt-4 text-xs text-muted-foreground">Redirecting to your dashboard…</p>
+          </Card>
+        ) : (
         <Card className="border-border/50 p-6 shadow-elevated sm:p-8">
           {step === 0 && (
             <section className="space-y-5">
@@ -665,6 +676,7 @@ export default function RegisterPage() {
             )}
           </div>
         </Card>
+        )}
       </div>
 
       <div id={RECAPTCHA_ID} className="sr-only" aria-hidden="true" />

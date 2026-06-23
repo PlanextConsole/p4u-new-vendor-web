@@ -1,5 +1,6 @@
 import { apiClient, type ApiErrorShape } from "./client";
 import { getMyVendorOnboarding, type VendorOnboardingRecord } from "./onboarding";
+import { VENDOR_AUTH } from "@/lib/storageKeys";
 
 const BASE = "/api/v1/vendor";
 
@@ -85,16 +86,28 @@ function isHttpStatus(err: unknown, status: number): boolean {
  */
 export async function getVendorMe(): Promise<VendorProfile> {
   try {
-    const real = await apiClient.get<VendorProfile>(`${BASE}/me`);
+    const real = await apiClient.getInternal<VendorProfile>(`${BASE}/me`, {
+      softAuthFailure: true,
+    });
+    const vt = String(real.vendorType || "").toUpperCase();
+    if (typeof window !== "undefined" && vt) {
+      localStorage.setItem(VENDOR_AUTH.vendorType, vt);
+    }
     return { ...real, source: "catalog" };
   } catch (err) {
-    if (!isHttpStatus(err, 404)) {
-      // For non-404 (auth/network) we still try the onboarding fallback once
-      // because in some setups gateway returns 401/500 when the catalog row
-      // is missing. If onboarding also fails, rethrow the original error.
+    if (isHttpStatus(err, 401)) throw err;
+    try {
+      const rec = await getMyVendorOnboarding();
+      const profile = onboardingToProfile(rec);
+      const vt = profile.vendorType;
+      if (typeof window !== "undefined" && vt) {
+        localStorage.setItem(VENDOR_AUTH.vendorType, vt);
+      }
+      return profile;
+    } catch (fallbackErr) {
+      if (isHttpStatus(fallbackErr, 401)) throw fallbackErr;
+      throw err;
     }
-    const rec = await getMyVendorOnboarding();
-    return onboardingToProfile(rec);
   }
 }
 

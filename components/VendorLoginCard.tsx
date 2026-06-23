@@ -7,7 +7,12 @@ import { useEffect, useRef, useState } from "react";
 import type { ConfirmationResult } from "firebase/auth";
 import { ArrowRight, CheckCircle2, ChevronDown, Loader2, Phone, Store } from "lucide-react";
 import { authApi } from "@/lib/api/auth";
-import { hasAccessToken, persistAuthSession } from "@/lib/authSession";
+import {
+  dashboardPathForVendorType,
+  getStoredVendorType,
+  hasValidAccessToken,
+  persistAuthSession,
+} from "@/lib/authSession";
 import { sendPhoneOtp, clearRecaptcha } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -86,10 +91,10 @@ export default function VendorLoginCard() {
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
   const submitLock = useRef(false);
 
-  // Already signed in (valid token persisted) — skip the login screen on reopen / new tab / "/".
+  // Already signed in with a non-expired token — skip login on reopen.
   useEffect(() => {
-    if (hasAccessToken()) {
-      router.replace("/dashboard/product");
+    if (hasValidAccessToken()) {
+      router.replace(dashboardPathForVendorType(getStoredVendorType()));
     }
   }, [router]);
 
@@ -162,11 +167,12 @@ export default function VendorLoginCard() {
       const idToken = await cred.user.getIdToken();
       const res = await authApi.phoneExchange(idToken, "VENDOR");
 
-      if (res.loggedIn) {
+      if (res.loggedIn && res.auth) {
         persistAuthSession(res.auth, toE164(phone));
+        const dash = dashboardPathForVendorType(getStoredVendorType());
         setInfo("Login successful! Redirecting…");
-        setTimeout(() => router.replace("/dashboard/product"), 280);
-      } else if (res.registrationToken) {
+        setTimeout(() => router.replace(dash), 280);
+      } else if ("registrationToken" in res && res.registrationToken) {
         sessionStorage.setItem("p4u_vendor_register_phone", toE164(phone));
         setError("No vendor account found for this phone. Redirecting you to registration…");
         setTimeout(() => router.push("/register"), 900);
@@ -265,9 +271,9 @@ export default function VendorLoginCard() {
               <div className="flex items-start gap-3 border-b border-success/20 bg-success/10 px-6 py-4 text-sm text-success">
                 <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
                 <div>
-                  <p className="font-semibold">Registration submitted</p>
+                  <p className="font-semibold">Vendor registration successful</p>
                   <p className="mt-0.5 text-xs opacity-90">
-                    Operations will review your application. You can sign in once your vendor account is approved.
+                    Your application was submitted. Sign in with your mobile OTP once admin has approved your account.
                   </p>
                 </div>
               </div>

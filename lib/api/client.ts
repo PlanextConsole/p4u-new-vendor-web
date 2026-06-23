@@ -30,6 +30,8 @@ interface RequestInternalOptions {
   skipAuthHeader?: boolean;
   skipAuthRefresh?: boolean;
   retry401?: boolean;
+  /** When true, 401 does not clear session / redirect to login (profile probe). */
+  softAuthFailure?: boolean;
 }
 
 function authHeaders(): Record<string, string> {
@@ -239,7 +241,8 @@ async function request<T>(
   options: RequestInit = {},
   internal: RequestInternalOptions = {},
 ): Promise<T> {
-  const { skipAuthHeader = false, skipAuthRefresh = false, retry401 = false } = internal;
+  const { skipAuthHeader = false, skipAuthRefresh = false, retry401 = false, softAuthFailure = false } =
+    internal;
   const url = `${BASE_URL}${path}`;
 
   if (!skipAuthRefresh) {
@@ -294,12 +297,19 @@ async function request<T>(
         await refreshAccessTokenDeduped();
         return request<T>(path, options, { ...internal, retry401: true });
       } catch {
-        forceLoginRedirect();
+        if (!softAuthFailure) forceLoginRedirect();
         throw {
           status: 401,
           message: "Session expired",
         } satisfies ApiErrorShape;
       }
+    }
+    if (res.status === 401 && retry401 && !softAuthFailure) {
+      forceLoginRedirect();
+      throw {
+        status: 401,
+        message: "Session expired",
+      } satisfies ApiErrorShape;
     }
     const envelopeError =
       parsed && typeof parsed === "object" && "error" in parsed
@@ -388,5 +398,9 @@ export const apiClient = {
       },
       internal,
     );
+  },
+
+  getInternal<T>(path: string, internal?: RequestInternalOptions) {
+    return request<T>(path, { method: "GET" }, internal);
   },
 };

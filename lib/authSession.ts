@@ -2,18 +2,73 @@ import { resetRefreshSessionState } from "@/lib/api/client";
 import { authApi, type LoginResponse } from "@/lib/api/auth";
 import { VENDOR_AUTH, VENDOR_TOKEN_EVENT, clearVendorAuthStorage } from "@/lib/storageKeys";
 import { signOutVendorFirebase } from "@/lib/firebase";
-export function persistAuthSession(res: LoginResponse, username: string) {
+
+type AuthPayload = LoginResponse & {
+  access_token?: string;
+  refresh_token?: string;
+  expires_in?: number;
+  vendor_type?: string;
+};
+
+function normalizeAuthTokens(res: AuthPayload) {
+  const accessToken = res.accessToken ?? res.access_token;
+  const refreshToken = res.refreshToken ?? res.refresh_token;
+  const expiresIn = res.expiresIn ?? res.expires_in;
+  if (!accessToken || !refreshToken) {
+    throw new Error("Login response did not include access and refresh tokens.");
+  }
+  return { accessToken, refreshToken, expiresIn: expiresIn ?? 300 };
+}
+
+export function dashboardPathForVendorType(vendorType?: string | null): string {
+  return String(vendorType || "").toUpperCase() === "SERVICE"
+    ? "/dashboard/service"
+    : "/dashboard/product";
+}
+
+export function persistAuthSession(res: LoginResponse, username: string, vendorType?: string | null) {
   if (typeof window === "undefined") return;
+  const { accessToken, refreshToken, expiresIn } = normalizeAuthTokens(res as AuthPayload);
   resetRefreshSessionState();
-  localStorage.setItem(VENDOR_AUTH.access, res.accessToken);
-  localStorage.setItem(VENDOR_AUTH.refresh, res.refreshToken);
-  localStorage.setItem(VENDOR_AUTH.expiresIn, String(res.expiresIn));
+  localStorage.setItem(VENDOR_AUTH.access, accessToken);
+  localStorage.setItem(VENDOR_AUTH.refresh, refreshToken);
+  localStorage.setItem(VENDOR_AUTH.expiresIn, String(expiresIn));
   localStorage.setItem(VENDOR_AUTH.username, username);
+  const vt =
+    vendorType ??
+    (res as AuthPayload).vendor_type ??
+    localStorage.getItem(VENDOR_AUTH.vendorType);
+  if (vt) localStorage.setItem(VENDOR_AUTH.vendorType, String(vt).toUpperCase());
   window.dispatchEvent(new CustomEvent(VENDOR_TOKEN_EVENT));
 }
 
 export function clearAuthSession() {
   clearVendorAuthStorage();
+}
+
+export function getStoredVendorType(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(VENDOR_AUTH.vendorType);
+}
+
+export function hasValidAccessToken(): boolean {
+  if (typeof window === "undefined") return false;
+  const access = localStorage.getItem(VENDOR_AUTH.access);
+  if (!access) return false;
+  try {
+    const part = access.split(".")[1];
+    if (!part) return false;
+    const b64 = part.replace(/-/g, "+").replace(/_/g, "/");
+    const payload = JSON.parse(atob(b64)) as { exp?: number };
+    if (typeof payload.exp === "number" && payload.exp * 1000 <= Date.now()) {
+      clearAuthSession();
+      return false;
+    }
+  } catch {
+    clearAuthSession();
+    return false;
+  }
+  return true;
 }
 
 /**
