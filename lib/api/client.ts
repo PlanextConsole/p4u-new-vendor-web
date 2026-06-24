@@ -184,13 +184,21 @@ async function refreshAccessTokenDeduped(): Promise<void> {
   await refreshInFlight;
 }
 
+/**
+ * Refresh only once the access token is close to expiring. Keycloak access
+ * tokens in this deployment live ~5 min, so a wide window (e.g. 5 min) would
+ * refresh a brand-new token on the very first request after login — and if that
+ * refresh of a just-minted token fails, the fresh session is killed and the user
+ * is bounced to login. Keep the window small so healthy tokens are left alone.
+ */
+const REFRESH_BEFORE_EXPIRY_MS = 60_000;
+
 export async function ensureTokenFresh(): Promise<void> {
   const { access, refresh } = tokenSnapshot();
   if (!access || !refresh) return;
   if (refreshSessionDead || Date.now() < refreshBlockedUntil) return;
   const expMs = decodeJwtExpMs(access);
-  /** Refresh a bit before expiry; wide window avoids hammering Keycloak on every request. */
-  if (expMs != null && expMs - Date.now() > 300_000) return;
+  if (expMs != null && expMs - Date.now() > REFRESH_BEFORE_EXPIRY_MS) return;
   await refreshAccessTokenDeduped();
 }
 

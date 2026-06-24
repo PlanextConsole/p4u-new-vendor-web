@@ -9,7 +9,7 @@ import {
   submitMyVendorOnboarding,
   type VendorOnboardingPayload,
 } from "@/lib/api/onboarding";
-import { getStoredUsername, hasValidAccessToken, signOutVendorCompletely } from "@/lib/authSession";
+import { getStoredUsername, hasVendorSession, signOutVendorCompletely } from "@/lib/authSession";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -97,7 +97,7 @@ export default function VendorOnboardingPage() {
   // existing pending onboarding row so a vendor can pick up where they left
   // off (instead of restarting from blank on every visit).
   useEffect(() => {
-    if (!hasValidAccessToken()) {
+    if (!hasVendorSession()) {
       router.replace("/");
       return;
     }

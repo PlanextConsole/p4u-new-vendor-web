@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FolderPlus, ImageIcon, Search, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, Folder, FolderPlus, ImageIcon, Search, Trash2, Upload } from "lucide-react";
 import { vendorMediaApi, type VendorMediaAsset, type VendorMediaFolder } from "@/lib/api/vendorMedia";
 import { resolveMediaUrl } from "@/lib/media";
 
@@ -42,6 +42,7 @@ function assetSize(asset: VendorMediaAsset): number {
 export default function VendorMediaLibraryView() {
   const [folders, setFolders] = useState<VendorMediaFolder[]>([]);
   const [assets, setAssets] = useState<VendorMediaAsset[]>([]);
+  const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [fileFilter, setFileFilter] = useState<FileFilter>("all");
   const [dragOver, setDragOver] = useState(false);
@@ -76,23 +77,41 @@ export default function VendorMediaLibraryView() {
     void load();
   }, [load]);
 
+  const activeFolder = useMemo(
+    () => folders.find((f) => f.id === activeFolderId) || null,
+    [folders, activeFolderId],
+  );
+
   const filteredFiles = useMemo(() => {
     const t = q.trim().toLowerCase();
     return assets.filter(
-      (f) => acceptFilter(fileFilter, f.mimeType) && (!t || f.originalName.toLowerCase().includes(t)),
+      (f) =>
+        acceptFilter(fileFilter, f.mimeType) &&
+        (activeFolderId == null || f.folderId === activeFolderId) &&
+        (!t || f.originalName.toLowerCase().includes(t)),
     );
-  }, [assets, q, fileFilter]);
+  }, [assets, q, fileFilter, activeFolderId]);
 
   const filteredFolders = useMemo(() => {
     const t = q.trim().toLowerCase();
     return folders.filter((f) => !t || f.name.toLowerCase().includes(t));
   }, [folders, q]);
 
-  const showIntroEmpty = !loading && assets.length === 0 && folders.length === 0 && !q.trim() && fileFilter === "all";
+  const folderFileCount = useCallback(
+    (folderId: string) => assets.filter((a) => a.folderId === folderId).length,
+    [assets],
+  );
+
+  // Folders are only listed at the library root, never inside an opened folder.
+  const showFolderGrid = activeFolderId == null && fileFilter === "all" && filteredFolders.length > 0;
+
+  const showIntroEmpty =
+    !loading && activeFolderId == null && assets.length === 0 && folders.length === 0 && !q.trim() && fileFilter === "all";
   const showFilterEmpty =
-    !showIntroEmpty && !loading && filteredFiles.length === 0 && (assets.length > 0 || q.trim().length > 0 || fileFilter !== "all");
+    !showIntroEmpty && !loading && filteredFiles.length === 0 && (assets.length > 0 || q.trim().length > 0 || fileFilter !== "all" || activeFolderId != null);
 
   async function ensureUploadFolder(): Promise<string> {
+    if (activeFolderId) return activeFolderId;
     if (folders[0]?.id) return folders[0].id;
     const created = await vendorMediaApi.createFolder("Library");
     setFolders((prev) => [created, ...prev]);
@@ -152,9 +171,27 @@ export default function VendorMediaLibraryView() {
   return (
     <div className="min-w-0 space-y-6">
       <div>
-        <p className="text-sm text-muted-foreground">
-          Organize images and documents for listings. Files are stored on the server and available across devices.
-        </p>
+        {activeFolder ? (
+          <div className="flex items-center gap-2 text-sm">
+            <button
+              type="button"
+              onClick={() => setActiveFolderId(null)}
+              className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5 font-semibold text-foreground hover:bg-muted"
+            >
+              <ArrowLeft className="h-4 w-4" aria-hidden />
+              All files
+            </button>
+            <span className="text-muted-foreground">/</span>
+            <span className="inline-flex items-center gap-1.5 font-semibold text-foreground">
+              <Folder className="h-4 w-4 text-primary" aria-hidden />
+              {activeFolder.name}
+            </span>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Organize images and documents for listings. Files are stored on the server and available across devices.
+          </p>
+        )}
       </div>
 
       {err ? (
@@ -204,7 +241,7 @@ export default function VendorMediaLibraryView() {
               className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-sm hover:bg-primary/90 disabled:opacity-60"
             >
               <Upload className="h-4 w-4" aria-hidden />
-              {uploading ? "Uploading…" : "Upload"}
+              {uploading ? "Uploading…" : activeFolder ? `Upload to ${activeFolder.name}` : "Upload"}
             </button>
             <input
               ref={inputRef}
@@ -248,17 +285,23 @@ export default function VendorMediaLibraryView() {
             <p className="py-12 text-center text-sm text-muted-foreground">Loading media library…</p>
           ) : null}
 
-          {!loading && filteredFolders.length > 0 && fileFilter === "all" ? (
+          {!loading && showFolderGrid ? (
             <ul className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {filteredFolders.map((f) => (
-                <li
-                  key={f.id}
-                  className="flex items-center justify-between gap-2 rounded-xl border border-border bg-muted/50/80 px-4 py-3"
-                >
-                  <div className="flex min-w-0 items-center gap-2">
-                    <FolderPlus className="h-5 w-5 shrink-0 text-primary" aria-hidden />
-                    <span className="truncate font-semibold text-foreground">{f.name}</span>
-                  </div>
+                <li key={f.id}>
+                  <button
+                    type="button"
+                    onClick={() => setActiveFolderId(f.id)}
+                    className="flex w-full items-center justify-between gap-2 rounded-xl border border-border bg-muted/50/80 px-4 py-3 text-left transition hover:border-primary/40 hover:bg-primary/5"
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      <Folder className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+                      <span className="truncate font-semibold text-foreground">{f.name}</span>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-card px-2 py-0.5 text-xs font-medium text-muted-foreground ring-1 ring-border">
+                      {folderFileCount(f.id)}
+                    </span>
+                  </button>
                 </li>
               ))}
             </ul>

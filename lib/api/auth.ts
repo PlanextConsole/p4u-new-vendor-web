@@ -71,6 +71,18 @@ export const authApi = {
   },
 
   /**
+   * Pre-OTP check: is this phone already a registered vendor? Used by the login
+   * screen so we don't send an SMS OTP to a number that has no vendor account.
+   */
+  vendorPhoneStatus(phone: string) {
+    return apiClient.postInternal<{ registered: boolean }>(
+      `${BASE}/public/vendor/phone-status`,
+      { phone },
+      { skipAuthHeader: true, skipAuthRefresh: true },
+    );
+  },
+
+  /**
    * Vendor OTP-LAST self-registration. Browser submits the whole wizard +
    * a fresh Firebase ID token; backend creates the Keycloak user, the
    * catalog_vendors row (status=pending) and the vendor_signup_requests

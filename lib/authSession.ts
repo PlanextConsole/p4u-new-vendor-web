@@ -60,15 +60,29 @@ export function hasValidAccessToken(): boolean {
     if (!part) return false;
     const b64 = part.replace(/-/g, "+").replace(/_/g, "/");
     const payload = JSON.parse(atob(b64)) as { exp?: number };
+    // NOTE: do NOT clear the session here. An expired access token does not mean
+    // the session is over — the refresh token usually still mints a new one. The
+    // API client / session provider refresh on demand; tearing down storage here
+    // would log the vendor out just for leaving a tab idle past the ~5 min token.
     if (typeof payload.exp === "number" && payload.exp * 1000 <= Date.now()) {
-      clearAuthSession();
       return false;
     }
   } catch {
-    clearAuthSession();
     return false;
   }
   return true;
+}
+
+/**
+ * True when the vendor still has a usable session — i.e. a non-expired access
+ * token OR a refresh token that can mint one. Route guards should use this (not
+ * `hasValidAccessToken`) so an idle-expired access token doesn't bounce the
+ * vendor to login when their refresh token is still good.
+ */
+export function hasVendorSession(): boolean {
+  if (typeof window === "undefined") return false;
+  if (hasValidAccessToken()) return true;
+  return Boolean(localStorage.getItem(VENDOR_AUTH.refresh));
 }
 
 /**

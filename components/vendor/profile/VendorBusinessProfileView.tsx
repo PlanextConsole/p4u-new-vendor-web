@@ -35,6 +35,8 @@ import {
 } from "@/lib/vendor/profileDisplay";
 import { Skeleton } from "@/components/ui/skeleton";
 import { VendorFormLayout } from "@/components/vendor/VendorListUi";
+import MediaLibraryPicker from "@/components/vendor/media/MediaLibraryPicker";
+import VendorPlansModal from "@/components/vendor/plans/VendorPlansModal";
 import { resolveMediaUrl } from "@/lib/media";
 
 function errMessage(e: unknown): string {
@@ -79,7 +81,8 @@ export default function VendorBusinessProfileView() {
 
   const [editOpen, setEditOpen] = useState(false);
   const [coverOpen, setCoverOpen] = useState(false);
-  const [coverUrlDraft, setCoverUrlDraft] = useState("");
+  const [plansOpen, setPlansOpen] = useState(false);
+  const [locating, setLocating] = useState(false);
 
   const [form, setForm] = useState({
     email: "",
@@ -177,20 +180,33 @@ export default function VendorBusinessProfileView() {
     }
   }
 
-  async function saveCoverUrl() {
+  async function saveCover(url: string) {
     if (!me || readOnly) return;
-    const url = coverUrlDraft.trim();
     setSaving(true);
     setBanner("");
     try {
-      const updated = await patchVendorProfile({ bannerUrl: url || null });
+      const updated = await patchVendorProfile({ bannerUrl: url.trim() || null });
       setMe({ ...updated, source: "catalog" });
       setCoverOpen(false);
-      setCoverUrlDraft("");
     } catch (e: unknown) {
       setBanner(errMessage(e));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function reverseGeocode(lat: number, lng: number): Promise<string> {
+    // OpenStreetMap Nominatim — free, no API key. Falls back silently on failure.
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&addressdetails=1`,
+        { headers: { Accept: "application/json" } },
+      );
+      if (!res.ok) return "";
+      const data = (await res.json()) as { display_name?: string };
+      return typeof data.display_name === "string" ? data.display_name : "";
+    } catch {
+      return "";
     }
   }
 
@@ -199,15 +215,25 @@ export default function VendorBusinessProfileView() {
       setBanner("Location is not available in this browser.");
       return;
     }
+    setLocating(true);
+    setBanner("");
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setForm((f) => ({
-          ...f,
-          lat: pos.coords.latitude.toFixed(6),
-          lng: pos.coords.longitude.toFixed(6),
-        }));
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setForm((f) => ({ ...f, lat: lat.toFixed(6), lng: lng.toFixed(6) }));
+        const address = await reverseGeocode(lat, lng);
+        if (address) {
+          setForm((f) => ({ ...f, shopAddress: address }));
+        } else {
+          setBanner("Pinned your coordinates, but couldn't auto-detect the address. Please type it in.");
+        }
+        setLocating(false);
       },
-      () => setBanner("Could not read your location. Allow access or enter coordinates manually."),
+      () => {
+        setBanner("Could not read your location. Allow access or enter coordinates manually.");
+        setLocating(false);
+      },
       { enableHighAccuracy: true, timeout: 12_000 },
     );
   }
@@ -277,10 +303,7 @@ export default function VendorBusinessProfileView() {
         <button
           type="button"
           disabled={readOnly || saving}
-          onClick={() => {
-            setCoverUrlDraft(bannerUrl);
-            setCoverOpen(true);
-          }}
+          onClick={() => setCoverOpen(true)}
           className="absolute bottom-3 right-3 inline-flex items-center gap-2 rounded-xl border border-white/80 bg-card/95 px-3 py-2 text-sm font-semibold text-foreground shadow-sm backdrop-blur hover:bg-card disabled:opacity-50"
         >
           <ImagePlus className="h-4 w-4 text-primary" aria-hidden />
@@ -361,10 +384,21 @@ export default function VendorBusinessProfileView() {
 
       {/* Plan & payment */}
       <section className="rounded-2xl border border-border bg-card p-5  sm:p-6">
-        <h2 className="flex items-center gap-2 text-lg font-bold text-foreground">
-          <Crown className="h-5 w-5 text-primary" aria-hidden />
-          Plan &amp; Payment
-        </h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="flex items-center gap-2 text-lg font-bold text-foreground">
+            <Crown className="h-5 w-5 text-primary" aria-hidden />
+            Plan &amp; Payment
+          </h2>
+          <button
+            type="button"
+            disabled={readOnly}
+            onClick={() => setPlansOpen(true)}
+            className="inline-flex items-center gap-2 rounded-xl border border-primary/40 bg-primary/5 px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/10 disabled:opacity-50"
+          >
+            <CreditCard className="h-4 w-4" aria-hidden />
+            {pay.paid ? "Change plan" : "Choose / Upgrade plan"}
+          </button>
+        </div>
         <div className="mt-4 rounded-[12px] border border-primary/25 bg-primary/10 px-4 py-4 sm:px-5 sm:py-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
@@ -529,10 +563,11 @@ export default function VendorBusinessProfileView() {
                   <button
                     type="button"
                     onClick={() => useCurrentLocation()}
-                    className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground hover:bg-muted"
+                    disabled={locating}
+                    className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground hover:bg-muted disabled:opacity-60"
                   >
                     <Navigation className="h-4 w-4 text-primary" aria-hidden />
-                    Use Current Location
+                    {locating ? "Detecting…" : "Use Current Location"}
                   </button>
                   <button
                     type="button"
@@ -552,49 +587,20 @@ export default function VendorBusinessProfileView() {
         </div>
       ) : null}
 
-      {coverOpen ? (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 p-4"
-          onClick={() => setCoverOpen(false)}
-          role="presentation"
-        >
-          <div
-            className="w-full max-w-md rounded-2xl bg-card p-6 shadow-2xl"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="cover-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 id="cover-title" className="text-lg font-bold text-foreground">
-              Cover image URL
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">Paste a direct link to an image (HTTPS).</p>
-            <input
-              className="mt-4 w-full rounded-xl border border-border px-4 py-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
-              value={coverUrlDraft}
-              onChange={(e) => setCoverUrlDraft(e.target.value)}
-              placeholder="https://…"
-            />
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setCoverOpen(false)}
-                className="rounded-xl border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => void saveCoverUrl()}
-                className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-60"
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <MediaLibraryPicker
+        open={coverOpen}
+        onClose={() => setCoverOpen(false)}
+        onSelect={(url) => void saveCover(url)}
+        title="Choose cover image"
+      />
+
+      <VendorPlansModal
+        open={plansOpen}
+        onClose={() => setPlansOpen(false)}
+        currentPlanId={planInfo?.plan?.id ?? null}
+        vendor={{ name: me.ownerName, email: me.email, phone: me.phone }}
+        onSuccess={() => void load()}
+      />
     </VendorFormLayout>
   );
 }

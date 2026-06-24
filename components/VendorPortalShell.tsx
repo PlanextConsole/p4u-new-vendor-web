@@ -30,7 +30,7 @@ import {
   User,
   Wrench,
 } from "lucide-react";
-import { getStoredUsername, hasValidAccessToken, signOutVendorCompletely } from "@/lib/authSession";
+import { getStoredUsername, hasVendorSession, signOutVendorCompletely } from "@/lib/authSession";
 import { getVendorMe, type VendorProfile } from "@/lib/api/vendor";
 import { Skeleton } from "@/components/ui/skeleton";
 import { VendorNotificationBell } from "@/components/vendor/VendorNotificationBell";
@@ -48,7 +48,7 @@ export default function VendorPortalShell({ children }: { children: React.ReactN
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
-    if (!hasValidAccessToken()) {
+    if (!hasVendorSession()) {
       router.replace("/");
       return;
     }

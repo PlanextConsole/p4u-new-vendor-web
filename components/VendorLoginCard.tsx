@@ -10,7 +10,7 @@ import { authApi } from "@/lib/api/auth";
 import {
   dashboardPathForVendorType,
   getStoredVendorType,
-  hasValidAccessToken,
+  hasVendorSession,
   persistAuthSession,
 } from "@/lib/authSession";
 import { sendPhoneOtp, clearRecaptcha } from "@/lib/firebase";
@@ -91,9 +91,10 @@ export default function VendorLoginCard() {
   const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
   const submitLock = useRef(false);
 
-  // Already signed in with a non-expired token — skip login on reopen.
+  // Already signed in (valid access OR a refresh token that can mint one) —
+  // skip the login screen on reopen and let the dashboard refresh as needed.
   useEffect(() => {
-    if (hasValidAccessToken()) {
+    if (hasVendorSession()) {
       router.replace(dashboardPathForVendorType(getStoredVendorType()));
     }
   }, [router]);
@@ -128,6 +129,20 @@ export default function VendorLoginCard() {
     submitLock.current = true;
     setLoading(true);
     try {
+      // Verify a vendor account exists for this phone before spending an OTP.
+      // If the check itself fails (network/server), fall through and still send
+      // the OTP — phone/exchange will route unregistered users afterwards.
+      try {
+        const status = await authApi.vendorPhoneStatus(toE164(phone));
+        if (!status.registered) {
+          sessionStorage.setItem("p4u_vendor_register_phone", toE164(phone));
+          setError("No vendor account found for this phone. Redirecting you to registration…");
+          setTimeout(() => router.push("/register"), 900);
+          return;
+        }
+      } catch {
+        // Pre-check unavailable — proceed with OTP rather than blocking sign-in.
+      }
       const c = await sendPhoneOtp(toE164(phone), RECAPTCHA_ID);
       setConfirmation(c);
       setStep("otp");

@@ -109,3 +109,47 @@ export function validateIfsc(code: string): string {
   if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(c)) return "Enter a valid IFSC (e.g. SBIN0001234).";
   return "";
 }
+
+/** Account numbers are 9–18 digits across Indian banks. */
+export const ACCOUNT_NUMBER_MAX = 18;
+
+/** Strip anything that is not allowed while typing a bank/holder name. */
+export function sanitizeBankNameInput(raw: string): string {
+  // Letters, spaces and the few punctuation marks real bank names use.
+  return raw.replace(/[^A-Za-z .&'-]/g, "").replace(/\s{2,}/g, " ");
+}
+
+export function sanitizeAccountHolderInput(raw: string): string {
+  // Personal/business holder names: letters, spaces and dots (initials) only.
+  return raw.replace(/[^A-Za-z .]/g, "").replace(/\s{2,}/g, " ");
+}
+
+export function validateBankName(value: string): string {
+  const v = value.trim();
+  if (!v) return "Bank name is required.";
+  if (v.length < 3) return "Bank name looks too short.";
+  if (!/^[A-Za-z][A-Za-z .&'-]*$/.test(v)) {
+    return "Bank name can only contain letters, spaces and . & ' -";
+  }
+  return "";
+}
+
+export function validateAccountHolderName(value: string): string {
+  const v = value.trim();
+  if (!v) return "Account holder name is required.";
+  if (v.length < 3) return "Name looks too short.";
+  if (!/^[A-Za-z][A-Za-z .]*$/.test(v)) {
+    return "Name can only contain letters, spaces and dots.";
+  }
+  return "";
+}
+
+export function validateAccountNumber(value: string): string {
+  const acct = value.replace(/\s/g, "");
+  if (!acct) return "Account number is required.";
+  if (!/^\d+$/.test(acct)) return "Account number can only contain digits.";
+  if (acct.length < 9 || acct.length > ACCOUNT_NUMBER_MAX) {
+    return `Enter a valid account number (9–${ACCOUNT_NUMBER_MAX} digits).`;
+  }
+  return "";
+}

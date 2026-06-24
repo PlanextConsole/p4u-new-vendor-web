@@ -10,11 +10,17 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getVendorMe, patchVendorProfile, type VendorProfile } from "@/lib/api/vendor";
 import {
+  ACCOUNT_NUMBER_MAX,
   accountTypeOptions,
   maskAccountNumber,
   newBankAccountId,
   parseBankAccounts,
+  sanitizeAccountHolderInput,
+  sanitizeBankNameInput,
   serializeBankAccounts,
+  validateAccountHolderName,
+  validateAccountNumber,
+  validateBankName,
   validateIfsc,
   type VendorBankAccount,
 } from "@/lib/vendor/bankAccounts";
@@ -96,11 +102,13 @@ export default function VendorBankAccountsView() {
 
   function validateForm(): boolean {
     const e: Record<string, string> = {};
-    if (!form.bankName.trim()) e.bankName = "Bank name is required.";
-    if (!form.accountHolderName.trim()) e.accountHolderName = "Account holder name is required.";
+    const bankErr = validateBankName(form.bankName);
+    if (bankErr) e.bankName = bankErr;
+    const holderErr = validateAccountHolderName(form.accountHolderName);
+    if (holderErr) e.accountHolderName = holderErr;
     const acct = form.accountNumber.replace(/\s/g, "");
-    if (!acct) e.accountNumber = "Account number is required.";
-    if (acct && !/^\d{6,18}$/.test(acct)) e.accountNumber = "Enter a valid account number (6–18 digits).";
+    const acctErr = validateAccountNumber(form.accountNumber);
+    if (acctErr) e.accountNumber = acctErr;
     const cfm = form.confirmAccountNumber.replace(/\s/g, "");
     if (!cfm) e.confirmAccountNumber = "Confirm your account number.";
     if (acct && cfm && acct !== cfm) e.confirmAccountNumber = "Account numbers do not match.";
@@ -273,7 +281,10 @@ export default function VendorBankAccountsView() {
                   className={inputClass}
                   placeholder="e.g. State Bank of India"
                   value={form.bankName}
-                  onChange={(e) => setForm((f) => ({ ...f, bankName: e.target.value }))}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, bankName: sanitizeBankNameInput(e.target.value) }))
+                  }
+                  maxLength={60}
                   autoComplete="organization"
                 />
                 {formErrors.bankName ? <p className="mt-1 text-sm text-destructive">{formErrors.bankName}</p> : null}
@@ -283,7 +294,13 @@ export default function VendorBankAccountsView() {
                 <Input
                   className={inputClass}
                   value={form.accountHolderName}
-                  onChange={(e) => setForm((f) => ({ ...f, accountHolderName: e.target.value }))}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      accountHolderName: sanitizeAccountHolderInput(e.target.value),
+                    }))
+                  }
+                  maxLength={60}
                   autoComplete="name"
                 />
                 {formErrors.accountHolderName ? (
@@ -296,8 +313,14 @@ export default function VendorBankAccountsView() {
                   className={inputClass}
                   inputMode="numeric"
                   autoComplete="off"
+                  maxLength={ACCOUNT_NUMBER_MAX}
                   value={form.accountNumber}
-                  onChange={(e) => setForm((f) => ({ ...f, accountNumber: e.target.value.replace(/\D/g, "") }))}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      accountNumber: e.target.value.replace(/\D/g, "").slice(0, ACCOUNT_NUMBER_MAX),
+                    }))
+                  }
                 />
                 {formErrors.accountNumber ? (
                   <p className="mt-1 text-sm text-destructive">{formErrors.accountNumber}</p>
@@ -310,9 +333,13 @@ export default function VendorBankAccountsView() {
                   placeholder="Re-enter account number"
                   inputMode="numeric"
                   autoComplete="off"
+                  maxLength={ACCOUNT_NUMBER_MAX}
                   value={form.confirmAccountNumber}
                   onChange={(e) =>
-                    setForm((f) => ({ ...f, confirmAccountNumber: e.target.value.replace(/\D/g, "") }))
+                    setForm((f) => ({
+                      ...f,
+                      confirmAccountNumber: e.target.value.replace(/\D/g, "").slice(0, ACCOUNT_NUMBER_MAX),
+                    }))
                   }
                 />
                 {formErrors.confirmAccountNumber ? (

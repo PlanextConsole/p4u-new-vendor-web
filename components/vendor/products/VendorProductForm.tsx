@@ -14,6 +14,7 @@ import { vendorUploadImage } from "@/lib/api/vendorUpload";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { VendorFormLayout } from "@/components/vendor/VendorListUi";
+import MediaLibraryPicker from "@/components/vendor/media/MediaLibraryPicker";
 import { cn } from "@/lib/utils";
 import { resolveMediaUrl } from "@/lib/media";
 
@@ -108,6 +109,7 @@ export function VendorProductForm({
   const [specPackSize, setSpecPackSize] = useState("");
   const [thumbnailUrl, setThumbnailUrl] = useState("");
   const [thumbUploading, setThumbUploading] = useState(false);
+  const [mediaPickerOpen, setMediaPickerOpen] = useState(false);
   const [moderationStatus, setModerationStatus] = useState<string>("approved");
   const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string[]>>({});
   const [slug, setSlug] = useState("");
@@ -257,7 +259,8 @@ export function VendorProductForm({
       setTab("general");
       return;
     }
-    if (!categoryId.trim()) {
+    // Subcategory is only required when the chosen category actually has children.
+    if (subcategories.length > 0 && !categoryId.trim()) {
       setErr("Select a subcategory.");
       setTab("general");
       return;
@@ -267,10 +270,12 @@ export function VendorProductForm({
     try {
       const sell = sellPrice.trim() || "0";
       const fin = finalPrice.trim() || sell;
+      // Leaf category: the subcategory if chosen, otherwise the parent itself.
+      const effectiveCategoryId = categoryId.trim() || parentCategoryId.trim() || null;
       const body = {
         name: name.trim(),
         availability,
-        categoryId: categoryId.trim() || null,
+        categoryId: effectiveCategoryId,
         serviceId: null,
         sellPrice: sell,
         discountAmount: discountAmount.trim() || "0",
@@ -412,14 +417,22 @@ export function VendorProductForm({
             </select>
           </label>
           <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-slate-700">Subcategory *</span>
+            <span className="mb-1.5 block text-sm font-medium text-slate-700">
+              Subcategory{subcategories.length > 0 ? " *" : ""}
+            </span>
             <select
               className="input w-full"
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
-              disabled={!parentCategoryId}
+              disabled={!parentCategoryId || subcategories.length === 0}
             >
-              <option value="">{parentCategoryId ? "Select subcategory" : "Select category first"}</option>
+              <option value="">
+                {!parentCategoryId
+                  ? "Select category first"
+                  : subcategories.length === 0
+                    ? "No subcategories — not required"
+                    : "Select subcategory"}
+              </option>
               {subcategories.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
@@ -465,6 +478,16 @@ export function VendorProductForm({
           </label>
           <div className="block space-y-2 md:col-span-2">
             <span className="mb-1.5 block text-sm font-medium text-slate-700">Product images</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setMediaPickerOpen(true)}
+                className="rounded-lg border border-primary/40 bg-primary/5 px-3 py-2 text-sm font-semibold text-primary hover:bg-primary/10"
+              >
+                Choose from Media Library
+              </button>
+              <span className="text-xs text-slate-500">or upload a new file</span>
+            </div>
             <input
               type="file"
               accept="image/*"
@@ -687,6 +710,13 @@ export function VendorProductForm({
           {saving ? "Saving…" : mode === "create" ? "Create product" : "Save changes"}
         </button>
       </div>
+
+      <MediaLibraryPicker
+        open={mediaPickerOpen}
+        onClose={() => setMediaPickerOpen(false)}
+        onSelect={(url) => setThumbnailUrl(url)}
+        title="Choose product image"
+      />
     </form>
     </VendorFormLayout>
   );
