@@ -1,6 +1,7 @@
 import { apiClient } from "./client";
 
-const BASE = "/api/v1/commerce";
+/** Service vendor bookings — same auth as `/api/v1/vendor/orders` (not commerce shopper permissions). */
+const BASE = "/api/v1/vendor";
 
 /** Row from `commerce_bookings` (vendor-scoped list). */
 export interface VendorBookingRow {
@@ -32,7 +33,7 @@ export const vendorBookingsApi = {
     if (params?.status) q.status = params.status;
     if (params?.limit != null) q.limit = params.limit;
     if (params?.offset != null) q.offset = params.offset;
-    return apiClient.get<VendorBookingListResponse>(`${BASE}/bookings/vendor`, q);
+    return apiClient.get<VendorBookingListResponse>(`${BASE}/bookings`, q);
   },
 
   updateStatus(
@@ -40,12 +41,12 @@ export const vendorBookingsApi = {
     status: "approved" | "rejected" | "in_progress" | "completed" | "cancelled",
   ) {
     return apiClient.patch<VendorBookingRow>(
-      `${BASE}/bookings/${encodeURIComponent(bookingId)}/status`,
+      `${BASE}/bookings/${encodeURIComponent(bookingId)}`,
       { status },
     );
   },
 
   get(bookingId: string) {
-    return apiClient.get<VendorBookingRow>(`${BASE}/bookings/vendor/${encodeURIComponent(bookingId)}`);
+    return apiClient.get<VendorBookingRow>(`${BASE}/bookings/${encodeURIComponent(bookingId)}`);
   },
 };
