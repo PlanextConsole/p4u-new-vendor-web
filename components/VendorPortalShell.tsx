@@ -93,7 +93,7 @@ export default function VendorPortalShell({ children }: { children: React.ReactN
 
   const vendorType = String(me?.vendorType || "").toUpperCase();
   const isService = vendorType === "SERVICE";
-  const displayName = getStoredUsername() || me?.ownerName || me?.businessName || "Vendor";
+  const displayName = me?.ownerName || me?.businessName || getStoredUsername() || "Vendor";
   const vendorInitial = displayName.trim().charAt(0).toUpperCase() || "V";
 
   const serviceLinks: NavLink[] = [

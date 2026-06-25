@@ -60,4 +60,11 @@ export const vendorMediaApi = {
   deleteAsset(assetId: string) {
     return apiClient.delete<{ ok: boolean }>(`${BASE}/me/media/assets/${encodeURIComponent(assetId)}`);
   },
+
+  moveAsset(assetId: string, folderId: string) {
+    return apiClient.patch<VendorMediaAsset>(
+      `${BASE}/me/media/assets/${encodeURIComponent(assetId)}`,
+      { folderId },
+    );
+  },
 };

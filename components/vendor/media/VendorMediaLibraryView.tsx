@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Folder, FolderPlus, ImageIcon, Search, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, Folder, FolderInput, FolderPlus, ImageIcon, Search, Trash2, Upload } from "lucide-react";
 import { vendorMediaApi, type VendorMediaAsset, type VendorMediaFolder } from "@/lib/api/vendorMedia";
 import { resolveMediaUrl } from "@/lib/media";
 
@@ -51,6 +51,8 @@ export default function VendorMediaLibraryView() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [moveAssetId, setMoveAssetId] = useState<string | null>(null);
+  const [moveFolderId, setMoveFolderId] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -135,6 +137,18 @@ export default function VendorMediaLibraryView() {
       setErr(e && typeof e === "object" && "message" in e ? String((e as { message: string }).message) : "Upload failed");
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function moveFile(assetId: string, folderId: string) {
+    setErr("");
+    try {
+      const row = await vendorMediaApi.moveAsset(assetId, folderId);
+      setAssets((prev) => prev.map((x) => (x.id === assetId ? row : x)));
+      setMoveAssetId(null);
+      setMoveFolderId("");
+    } catch (e: unknown) {
+      setErr(e && typeof e === "object" && "message" in e ? String((e as { message: string }).message) : "Move failed");
     }
   }
 
@@ -330,6 +344,17 @@ export default function VendorMediaLibraryView() {
                     />
                     <button
                       type="button"
+                      onClick={() => {
+                        setMoveAssetId(f.id);
+                        setMoveFolderId(folders.find((x) => x.id !== f.folderId)?.id || "");
+                      }}
+                      className="absolute left-2 top-2 rounded-lg bg-card/95 p-2 text-muted-foreground opacity-0 shadow-sm ring-1 ring-border transition hover:text-primary group-hover:opacity-100"
+                      aria-label={`Move ${f.originalName}`}
+                    >
+                      <FolderInput className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => void removeFile(f.id)}
                       className="absolute right-2 top-2 rounded-lg bg-card/95 p-2 text-muted-foreground opacity-0 shadow-sm ring-1 ring-border transition hover:text-destructive group-hover:opacity-100"
                       aria-label={`Delete ${f.originalName}`}
@@ -359,6 +384,55 @@ export default function VendorMediaLibraryView() {
           ) : null}
         </div>
       </div>
+
+      {moveAssetId ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 p-4"
+          onClick={() => setMoveAssetId(null)}
+          role="presentation"
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-card p-6 shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="move-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="move-title" className="text-lg font-bold text-foreground">
+              Move to folder
+            </h2>
+            <select
+              className="mt-4 w-full rounded-xl border border-border px-4 py-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/25"
+              value={moveFolderId}
+              onChange={(e) => setMoveFolderId(e.target.value)}
+            >
+              <option value="">Select folder…</option>
+              {folders.map((folder) => (
+                <option key={folder.id} value={folder.id}>
+                  {folder.name}
+                </option>
+              ))}
+            </select>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setMoveAssetId(null)}
+                className="rounded-xl border border-border px-4 py-2 text-sm font-semibold text-foreground hover:bg-muted"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!moveFolderId}
+                onClick={() => moveAssetId && moveFolderId && void moveFile(moveAssetId, moveFolderId)}
+                className="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+              >
+                Move
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {folderModal ? (
         <div

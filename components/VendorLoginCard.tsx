@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ConfirmationResult } from "firebase/auth";
 import { ArrowRight, CheckCircle2, ChevronDown, Loader2, Phone, Store } from "lucide-react";
 import { authApi } from "@/lib/api/auth";
+import { getVendorMe } from "@/lib/api/vendor";
 import {
   dashboardPathForVendorType,
   getStoredVendorType,
@@ -184,6 +185,13 @@ export default function VendorLoginCard() {
 
       if (res.loggedIn && res.auth) {
         persistAuthSession(res.auth, toE164(phone));
+        try {
+          const me = await getVendorMe();
+          const label = me.ownerName?.trim() || me.businessName?.trim();
+          if (label) persistAuthSession(res.auth, label);
+        } catch {
+          /* keep phone fallback already stored */
+        }
         const dash = dashboardPathForVendorType(getStoredVendorType());
         setInfo("Login successful! Redirecting…");
         setTimeout(() => router.replace(dash), 280);

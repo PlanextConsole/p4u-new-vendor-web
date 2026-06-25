@@ -53,6 +53,22 @@ export interface CatalogProductRow {
   updatedAt?: string;
   /** Units sold (from completed orders); present on list responses. */
   unitsSold?: number;
+  variations?: ProductVariationRow[];
+}
+
+export interface ProductVariationRow {
+  id: string;
+  productId?: string;
+  sku?: string | null;
+  attributes: Record<string, string>;
+  sellPrice: string;
+  discountAmount?: string;
+  finalPrice: string;
+  quantity: number;
+  thumbnailUrl?: string | null;
+  isActive?: boolean;
+  sortOrder?: number;
+  metadata?: Record<string, unknown> | null;
 }
 
 export interface ProductListResponse {

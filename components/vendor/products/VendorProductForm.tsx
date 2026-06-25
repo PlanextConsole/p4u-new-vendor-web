@@ -64,7 +64,39 @@ function resolvePublicAssetUrl(u: string) {
   return resolveMediaUrl(u) || u;
 }
 
-type TabKey = "general" | "pricing" | "attributes" | "seo";
+type VariationDraft = {
+  id?: string;
+  sku: string;
+  attributes: Record<string, string>;
+  sellPrice: string;
+  discountAmount: string;
+  finalPrice: string;
+  quantity: string;
+  isActive: boolean;
+};
+
+function cartesianCombinations(attrs: Record<string, string[]>): Record<string, string>[] {
+  const keys = Object.keys(attrs).filter((k) => (attrs[k] || []).length > 0);
+  if (!keys.length) return [];
+  return keys.reduce<Record<string, string>[]>((acc, key) => {
+    const vals = attrs[key];
+    if (!acc.length) return vals.map((v) => ({ [key]: v }));
+    const out: Record<string, string>[] = [];
+    for (const row of acc) {
+      for (const v of vals) out.push({ ...row, [key]: v });
+    }
+    return out;
+  }, []);
+}
+
+function attrsKey(attrs: Record<string, string>): string {
+  return Object.keys(attrs)
+    .sort()
+    .map((k) => `${k}=${attrs[k]}`)
+    .join("|");
+}
+
+type TabKey = "general" | "pricing" | "attributes" | "variations" | "seo";
 
 export function VendorProductForm({
   mode,
@@ -115,6 +147,7 @@ export function VendorProductForm({
   const [slug, setSlug] = useState("");
   const [metaTitle, setMetaTitle] = useState("");
   const [metaDescription, setMetaDescription] = useState("");
+  const [variations, setVariations] = useState<VariationDraft[]>([]);
 
   const rootCategories = useMemo(
     () => categories.filter((c) => c.parentId == null),
@@ -171,6 +204,19 @@ export function VendorProductForm({
     setSlug(String(meta.slug || meta.seoSlug || ""));
     setMetaTitle(String(meta.metaTitle || meta.meta_title || ""));
     setMetaDescription(String(meta.metaDescription || meta.meta_description || ""));
+    const loaded = Array.isArray((row as CatalogProductRow).variations) ? (row as CatalogProductRow).variations! : [];
+    setVariations(
+      loaded.map((v) => ({
+        id: v.id,
+        sku: v.sku || "",
+        attributes: v.attributes || {},
+        sellPrice: String(v.sellPrice ?? ""),
+        discountAmount: String(v.discountAmount ?? "0"),
+        finalPrice: String(v.finalPrice ?? v.sellPrice ?? ""),
+        quantity: String(v.quantity ?? 0),
+        isActive: v.isActive !== false,
+      })),
+    );
   }, []);
 
   useEffect(() => {
@@ -247,6 +293,41 @@ export function VendorProductForm({
     }
   }
 
+  function generateVariationsFromAttributes() {
+    const combos = cartesianCombinations(selectedAttributes);
+    if (!combos.length) {
+      setErr("Select at least one attribute value before generating variations.");
+      setTab("attributes");
+      return;
+    }
+    const sell = sellPrice.trim() || "0";
+    const fin = finalPrice.trim() || sell;
+    const disc = discountAmount.trim() || "0";
+    const stock = quantity.trim() || "0";
+    setVariations((prev) => {
+      const byKey = new Map(prev.map((r) => [attrsKey(r.attributes), r]));
+      return combos.map((attributes) => {
+        const existing = byKey.get(attrsKey(attributes));
+        return (
+          existing || {
+            attributes,
+            sku: "",
+            sellPrice: sell,
+            discountAmount: disc,
+            finalPrice: fin,
+            quantity: stock,
+            isActive: true,
+          }
+        );
+      });
+    });
+    setTab("variations");
+  }
+
+  function updateVariationRow(index: number, patch: Partial<VariationDraft>) {
+    setVariations((prev) => prev.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) {
@@ -311,6 +392,21 @@ export function VendorProductForm({
           metaTitle: metaTitle.trim() || null,
           metaDescription: metaDescription.trim() || null,
         },
+        ...(productType === "variable"
+          ? {
+              variations: variations.map((v, idx) => ({
+                ...(v.id ? { id: v.id } : {}),
+                sku: v.sku.trim() || null,
+                attributes: v.attributes,
+                sellPrice: v.sellPrice.trim() || sell,
+                discountAmount: v.discountAmount.trim() || "0",
+                finalPrice: v.finalPrice.trim() || v.sellPrice.trim() || sell,
+                quantity: Number(v.quantity) || 0,
+                isActive: v.isActive !== false,
+                sortOrder: idx,
+              })),
+            }
+          : {}),
       };
       if (mode === "create") {
         await vendorCatalogApi.createProduct(body);
@@ -358,6 +454,7 @@ export function VendorProductForm({
             ["general", "General"],
             ["pricing", "Pricing"],
             ["attributes", "Attributes"],
+            ...(productType === "variable" ? ([["variations", "Variations"]] as const) : []),
             ["seo", "SEO"],
           ] as const
         ).map(([k, label]) => (
@@ -619,6 +716,20 @@ export function VendorProductForm({
 
       {tab === "attributes" && (
         <Card className="p-6">
+          {productType === "variable" ? (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
+              <p className="text-sm text-foreground">
+                Select attribute values, then generate SKU rows on the <strong>Variations</strong> tab.
+              </p>
+              <button
+                type="button"
+                onClick={generateVariationsFromAttributes}
+                className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+              >
+                Generate variations
+              </button>
+            </div>
+          ) : null}
           {attributeDefs.length === 0 ? (
             <p className="text-sm text-muted-foreground">No active product attributes.</p>
           ) : (
@@ -669,6 +780,98 @@ export function VendorProductForm({
                   </div>
                 );
               })}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {tab === "variations" && productType === "variable" && (
+        <Card className="space-y-4 p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-base font-semibold text-foreground">Variation SKUs</h3>
+              <p className="text-sm text-muted-foreground">Each row is a purchasable combination with its own price and stock.</p>
+            </div>
+            <button
+              type="button"
+              onClick={generateVariationsFromAttributes}
+              className="rounded-lg border border-primary/40 bg-primary/5 px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/10"
+            >
+              Regenerate from attributes
+            </button>
+          </div>
+          {variations.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No variations yet. Select attributes and click Generate.</p>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-border">
+              <table className="min-w-full text-sm">
+                <thead className="bg-muted/50 text-left">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">Attributes</th>
+                    <th className="px-3 py-2 font-medium">SKU</th>
+                    <th className="px-3 py-2 font-medium">MRP</th>
+                    <th className="px-3 py-2 font-medium">Discount</th>
+                    <th className="px-3 py-2 font-medium">Final</th>
+                    <th className="px-3 py-2 font-medium">Stock</th>
+                    <th className="px-3 py-2 font-medium">Active</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {variations.map((row, idx) => (
+                    <tr key={attrsKey(row.attributes) || idx} className="border-t border-border">
+                      <td className="px-3 py-2 align-top text-xs text-muted-foreground">
+                        {Object.entries(row.attributes)
+                          .map(([k, v]) => `${k}: ${v}`)
+                          .join(" · ")}
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input
+                          className="h-9 min-w-[96px]"
+                          value={row.sku}
+                          onChange={(e) => updateVariationRow(idx, { sku: e.target.value })}
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input
+                          className="h-9 w-24"
+                          value={row.sellPrice}
+                          onChange={(e) => updateVariationRow(idx, { sellPrice: e.target.value })}
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input
+                          className="h-9 w-24"
+                          value={row.discountAmount}
+                          onChange={(e) => updateVariationRow(idx, { discountAmount: e.target.value })}
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input
+                          className="h-9 w-24"
+                          value={row.finalPrice}
+                          onChange={(e) => updateVariationRow(idx, { finalPrice: e.target.value })}
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input
+                          className="h-9 w-20"
+                          type="number"
+                          min={0}
+                          value={row.quantity}
+                          onChange={(e) => updateVariationRow(idx, { quantity: e.target.value })}
+                        />
+                      </td>
+                      <td className="px-3 py-2">
+                        <input
+                          type="checkbox"
+                          checked={row.isActive}
+                          onChange={(e) => updateVariationRow(idx, { isActive: e.target.checked })}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </Card>
