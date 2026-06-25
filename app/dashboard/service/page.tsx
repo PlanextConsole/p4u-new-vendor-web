@@ -7,7 +7,6 @@ import {
   CreditCard,
   DollarSign,
   History,
-  ShoppingCart,
   Star,
   Wrench,
 } from "lucide-react";
@@ -96,11 +95,11 @@ export default function ServiceVendorDashboardPage() {
         icon: DollarSign,
       },
       {
-        title: "Active Orders",
+        title: "Active Bookings",
         value: String(pendingTotal),
         hint: "Awaiting confirmation",
         hintPositive: true,
-        icon: ShoppingCart,
+        icon: CalendarCheck,
       },
       {
         title: "Listed Services",

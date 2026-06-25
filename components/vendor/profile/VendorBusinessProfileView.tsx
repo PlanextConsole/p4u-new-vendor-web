@@ -22,10 +22,12 @@ import {
   X,
 } from "lucide-react";
 import { getVendorMe, patchVendorProfile, type VendorProfile } from "@/lib/api/vendor";
+import { vendorBookingsApi } from "@/lib/api/vendorBookings";
 import { vendorPlanApi, type VendorPlanInfoDto } from "@/lib/api/vendorPlan";
 import { vendorOrdersApi } from "@/lib/api/vendorOrders";
 import { vendorCatalogApi } from "@/lib/api/vendorCatalog";
 import { vendorOfferedServicesApi } from "@/lib/api/vendorOfferedServices";
+import { bookingAmount } from "@/lib/vendor/dashboardMetrics";
 import {
   formatInr,
   formatPercent,
@@ -445,7 +447,7 @@ export default function VendorBusinessProfileView() {
           </div>
           <div>
             <p className="text-3xl font-bold tracking-tight text-foreground">{orderTotal}</p>
-            <p className="mt-1 text-sm font-medium text-muted-foreground">Orders</p>
+            <p className="mt-1 text-sm font-medium text-muted-foreground">{isProduct ? "Orders" : "Bookings"}</p>
           </div>
           <div>
             <p className="text-3xl font-bold tracking-tight text-foreground">{formatInr(revenue)}</p>
