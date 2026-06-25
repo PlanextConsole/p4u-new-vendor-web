@@ -25,12 +25,14 @@ import { getVendorMe, patchVendorProfile, type VendorProfile } from "@/lib/api/v
 import { vendorPlanApi, type VendorPlanInfoDto } from "@/lib/api/vendorPlan";
 import { vendorOrdersApi } from "@/lib/api/vendorOrders";
 import { vendorCatalogApi } from "@/lib/api/vendorCatalog";
+import { vendorOfferedServicesApi } from "@/lib/api/vendorOfferedServices";
 import {
   formatInr,
   formatPercent,
+  formatServiceSubtitle,
   latLngFromJson,
   pickFirstCategoryLabel,
-  pickFirstServiceLabel,
+  serviceIdsFromJson,
   shopAddressFromJson,
 } from "@/lib/vendor/profileDisplay";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -71,6 +73,7 @@ export default function VendorBusinessProfileView() {
   const pathname = usePathname();
   const dashRoot = pathname.includes("/dashboard/service") ? "/dashboard/service" : "/dashboard/product";
   const [me, setMe] = useState<VendorProfile | null>(null);
+  const [serviceSubtitle, setServiceSubtitle] = useState("");
   const [planInfo, setPlanInfo] = useState<VendorPlanInfoDto | null>(null);
   const [productTotal, setProductTotal] = useState<number | null>(null);
   const [orderTotal, setOrderTotal] = useState(0);
@@ -124,12 +127,27 @@ export default function VendorBusinessProfileView() {
         if (String(profile.vendorType || "").toUpperCase() === "PRODUCT") {
           const pr = await vendorCatalogApi.listProducts({ limit: 1, offset: 0, status: "all" }).catch(() => null);
           setProductTotal(pr?.total ?? 0);
+          setServiceSubtitle("");
         } else {
-          const svcs = profile.servicesJson;
-          setProductTotal(Array.isArray(svcs) ? svcs.length : 0);
+          const offerings = await vendorOfferedServicesApi.listOfferings().catch(() => []);
+          const fromOfferings = offerings
+            .map((o) => String(o.catalogName || o.metadata?.displayName || "").trim())
+            .filter(Boolean);
+          let label = formatServiceSubtitle(fromOfferings);
+          if (!label) {
+            const catalogItems = await vendorOfferedServicesApi.listCatalogServiceItems().catch(() => []);
+            const nameById = new Map(catalogItems.map((c) => [c.id, c.name]));
+            const resolved = serviceIdsFromJson(profile.servicesJson)
+              .map((id) => nameById.get(id) || "")
+              .filter(Boolean);
+            label = formatServiceSubtitle(resolved);
+          }
+          setServiceSubtitle(label);
+          setProductTotal(offerings.length > 0 ? offerings.length : serviceIdsFromJson(profile.servicesJson).length);
         }
       } else {
         setPlanInfo(null);
+        setServiceSubtitle("");
         const svcs = profile.servicesJson;
         setProductTotal(Array.isArray(svcs) ? svcs.length : 0);
         setOrderTotal(0);
@@ -255,9 +273,9 @@ export default function VendorBusinessProfileView() {
     );
   }
 
-  const categoryOrService = isProduct ? pickFirstCategoryLabel(me.categoriesJson) : pickFirstServiceLabel(me.servicesJson);
+  const categoryOrService = isProduct ? pickFirstCategoryLabel(me.categoriesJson) : serviceSubtitle;
   const subtitleParts = [me.ownerName, categoryOrService].filter(Boolean);
-  const subtitle = subtitleParts.join(" • ") || me.ownerName || "—";
+  const subtitle = subtitleParts.join(" • ") || me.ownerName || me.businessName || "—";
 
   const commissionDisplay = formatPercent(
     planInfo?.effective?.commissionPercent ?? (me as { commissionRate?: string }).commissionRate,
