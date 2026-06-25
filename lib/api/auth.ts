@@ -54,6 +54,14 @@ export interface RegisterVendorByPhonePayload {
   bankJson?: Record<string, unknown> | null;
 }
 
+/** No-OTP vendor registration payload — business details only, no Firebase token. */
+export type RegisterVendorPayload = Omit<RegisterVendorByPhonePayload, "firebaseIdToken"> & {
+  phone: string;
+};
+
+/** Vendor account state for the login pre-check. */
+export type VendorAccountStatus = "not_registered" | "pending" | "approved" | "rejected";
+
 export const authApi = {
   /**
    * Step 1 of phone-OTP login. The browser already verified the OTP via
@@ -75,9 +83,22 @@ export const authApi = {
    * screen so we don't send an SMS OTP to a number that has no vendor account.
    */
   vendorPhoneStatus(phone: string) {
-    return apiClient.postInternal<{ registered: boolean }>(
+    return apiClient.postInternal<{ registered: boolean; status: VendorAccountStatus }>(
       `${BASE}/public/vendor/phone-status`,
       { phone },
+      { skipAuthHeader: true, skipAuthRefresh: true },
+    );
+  },
+
+  /**
+   * No-OTP vendor self-registration. Submits the wizard fields; the backend
+   * records a pending request for admin approval and creates no account. The
+   * vendor signs in via OTP only after approval.
+   */
+  registerVendor(payload: RegisterVendorPayload) {
+    return apiClient.postInternal<{ status: string; message: string }>(
+      `${BASE}/public/vendor/register`,
+      payload,
       { skipAuthHeader: true, skipAuthRefresh: true },
     );
   },

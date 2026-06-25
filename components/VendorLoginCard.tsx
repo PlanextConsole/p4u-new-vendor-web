@@ -130,17 +130,32 @@ export default function VendorLoginCard() {
     submitLock.current = true;
     setLoading(true);
     try {
-      // Verify a vendor account exists for this phone before spending an OTP.
+      // Check the vendor's approval status before spending an OTP. Only an
+      // APPROVED vendor receives an OTP. Pending/rejected applicants are shown a
+      // status message; unregistered numbers are routed to the signup wizard.
       // If the check itself fails (network/server), fall through and still send
-      // the OTP — phone/exchange will route unregistered users afterwards.
+      // the OTP — phone/exchange enforces the same rules as a backstop.
       try {
-        const status = await authApi.vendorPhoneStatus(toE164(phone));
-        if (!status.registered) {
+        const { status } = await authApi.vendorPhoneStatus(toE164(phone));
+        if (status === "pending") {
+          setError(
+            "Your registration request is still pending approval. Please wait until your account is approved.",
+          );
+          return;
+        }
+        if (status === "rejected") {
+          setError(
+            "Your vendor registration request was rejected. Please contact support for assistance.",
+          );
+          return;
+        }
+        if (status === "not_registered") {
           sessionStorage.setItem("p4u_vendor_register_phone", toE164(phone));
           setError("No vendor account found for this phone. Redirecting you to registration…");
           setTimeout(() => router.push("/register"), 900);
           return;
         }
+        // status === "approved" → continue and send the OTP.
       } catch {
         // Pre-check unavailable — proceed with OTP rather than blocking sign-in.
       }

@@ -2,25 +2,17 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import type { ConfirmationResult } from "firebase/auth";
+import { useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, CheckCircle2, Loader2, Store } from "lucide-react";
 import { authApi } from "@/lib/api/auth";
-import { clearAuthSession, dashboardPathForVendorType, persistAuthSession } from "@/lib/authSession";
-import { clearRecaptcha, sendPhoneOtp, signOutVendorFirebase } from "@/lib/firebase";
+import { clearAuthSession } from "@/lib/authSession";
+import { signOutVendorFirebase } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
   AuthPageBackground,
   FormField,
-  OtpInputRow,
   ReviewRow,
   WizardStepBar,
 } from "@/components/auth/auth-ui";
@@ -28,10 +20,6 @@ import {
 const STEPS = ["Details", "KYC & Documents", "Bank", "Review"] as const;
 
 type VendorKindChoice = "SERVICE" | "PRODUCT";
-
-const RECAPTCHA_ID = "p4u-vendor-register-recaptcha";
-const OTP_LEN = 6;
-const RESEND_S = 30;
 
 function validatePhone(raw: string): string {
   const d = raw.replace(/\D/g, "");
@@ -41,29 +29,20 @@ function validatePhone(raw: string): string {
   return "";
 }
 
-function toE164(raw: string): string {
-  return `+91${raw.replace(/\D/g, "").slice(-10)}`;
-}
-
 function maskPhone(raw: string) {
   const d = raw.replace(/\D/g, "").slice(-10);
   return `+91-${d.slice(0, 3)}***${d.slice(-3)}`;
 }
 
 /**
- * Vendor self-registration form (OTP-LAST flow).
+ * Vendor self-registration form (NO OTP).
+ *
+ * The vendor fills the wizard end-to-end and submits. We record a pending
+ * registration request for admin review — no phone verification, no account is
+ * created here. After an admin approves, the vendor signs in via mobile OTP.
  *
  * Field set is intentionally aligned with `p4u-admin-web/.../VendorFormLayer.jsx`
- * (the form admin uses for both Product Vendor and Service Vendor) so that the
- * data captured here can be promoted into a catalog vendor row by ops with no
- * field translation. Admin-only fields (status, vendor plan, commission %,
- * enrollment cost, payment status, transaction ref) are deliberately omitted.
- *
- * Flow: vendor fills the wizard end-to-end → clicks Submit → an OTP modal
- * verifies the phone via Firebase Phone Auth → on success we ship the whole
- * payload + a fresh Firebase ID token to the backend, which creates the
- * Keycloak user + catalog_vendors row + audit row in one shot and returns
- * Keycloak tokens. The browser then lands directly inside the dashboard.
+ * so the captured data maps cleanly into a catalog vendor row on approval.
  */
 export default function RegisterPage() {
   const router = useRouter();
@@ -100,18 +79,6 @@ export default function RegisterPage() {
     accountNumber: "",
   });
 
-  // OTP modal state
-  const [otpOpen, setOtpOpen] = useState(false);
-  const [otpStep, setOtpStep] = useState<"send" | "verify">("send");
-  const [confirmation, setConfirmation] = useState<ConfirmationResult | null>(null);
-  const [otp, setOtp] = useState<string[]>(Array(OTP_LEN).fill(""));
-  const [otpError, setOtpError] = useState("");
-  const [otpInfo, setOtpInfo] = useState("");
-  const [otpLoading, setOtpLoading] = useState(false);
-  const [timer, setTimer] = useState(RESEND_S);
-  const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
-  const sendLock = useRef(false);
-
   // Keep registration on a clean session, so vendor self-signup is never
   // confused with a stale customer/admin token from another tab.
   useEffect(() => {
@@ -131,18 +98,6 @@ export default function RegisterPage() {
     }
   }, []);
 
-  useEffect(() => {
-    return () => {
-      clearRecaptcha();
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!otpOpen || otpStep !== "verify" || timer <= 0) return;
-    const id = setInterval(() => setTimer((t) => t - 1), 1000);
-    return () => clearInterval(id);
-  }, [otpOpen, otpStep, timer]);
-
   function next() {
     setError("");
     setStep((s) => Math.min(s + 1, STEPS.length - 1));
@@ -153,9 +108,8 @@ export default function RegisterPage() {
     setStep((s) => Math.max(s - 1, 0));
   }
 
-  function buildPayload(idToken: string) {
+  function buildPayload() {
     return {
-      firebaseIdToken: idToken,
       vendorKind: (vendorKind === "SERVICE" ? "service" : "product") as
         | "service"
         | "product",
@@ -163,7 +117,7 @@ export default function RegisterPage() {
       ownerName: details.ownerName.trim(),
       businessName: details.businessName.trim(),
       email: details.email.trim() || null,
-      phone: details.phone.trim() || null,
+      phone: details.phone.trim(),
       categoriesJson:
         vendorKind === "PRODUCT" && details.categorySlug.trim()
           ? [details.categorySlug.trim()]
@@ -192,7 +146,7 @@ export default function RegisterPage() {
     };
   }
 
-  async function openOtpAndSend() {
+  async function submitRegistration() {
     setError("");
     if (!details.ownerName.trim() || !details.businessName.trim()) {
       setError("Owner name and business name are required.");
@@ -205,165 +159,22 @@ export default function RegisterPage() {
       setStep(0);
       return;
     }
-    clearRecaptcha();
-    setOtpOpen(true);
-    setOtpStep("send");
-    setOtpError("");
-    setOtpInfo("");
-    await sendOtp();
-  }
-
-  async function sendOtp() {
-    if (sendLock.current) return;
-    sendLock.current = true;
-    setOtpLoading(true);
-    setOtpError("");
-    try {
-      const c = await sendPhoneOtp(toE164(details.phone), RECAPTCHA_ID);
-      setConfirmation(c);
-      setOtp(Array(OTP_LEN).fill(""));
-      setTimer(RESEND_S);
-      setOtpStep("verify");
-      setTimeout(() => otpRefs.current[0]?.focus(), 60);
-    } catch (err: unknown) {
-      const code = String((err as { code?: string })?.code || "");
-      if (code.includes("too-many-requests")) {
-        setOtpError("Too many OTP attempts. Please try again later.");
-      } else if (code.includes("invalid-phone-number")) {
-        setOtpError("Invalid phone number for OTP delivery.");
-      } else if (code.includes("operation-not-allowed")) {
-        setOtpError(
-          "Phone sign-in is not enabled in Firebase. Ask the admin to enable it.",
-        );
-      } else if (code.includes("argument-error")) {
-        setOtpError(
-          "Phone verification could not start. Close this dialog and try “Verify phone & Submit” again, or tap Retry.",
-        );
-      } else {
-        setOtpError(
-          (err as { message?: string })?.message ||
-            "Failed to send OTP. Please retry.",
-        );
-      }
-      setOtpStep("send");
-    } finally {
-      sendLock.current = false;
-      setOtpLoading(false);
-    }
-  }
-
-  async function resend() {
-    if (timer > 0 || otpLoading) return;
-    setOtpInfo("");
-    await sendOtp();
-    setOtpInfo("OTP resent. Please check your messages.");
-  }
-
-  async function verifyAndSubmit() {
-    if (!confirmation) {
-      setOtpError("OTP session expired. Please request a new code.");
-      return;
-    }
-    if (otp.some((d) => d === "")) {
-      setOtpError("Please enter all 6 digits.");
-      return;
-    }
-    setOtpLoading(true);
-    setOtpError("");
     setLoading(true);
     try {
-      const cred = await confirmation.confirm(otp.join(""));
-      const idToken = await cred.user.getIdToken();
-      const payload = buildPayload(idToken);
-      const auth = await authApi.registerVendorByPhone(payload);
-      persistAuthSession(auth, toE164(details.phone), vendorKind);
+      await authApi.registerVendor(buildPayload());
       setRegistrationSuccess(true);
-      setOtpOpen(false);
       setTimeout(() => {
-        router.replace(dashboardPathForVendorType(vendorKind));
-      }, 3200);
+        router.replace("/login?registered=1");
+      }, 4000);
     } catch (err: unknown) {
-      const code = String((err as { code?: string })?.code || "");
-      const status =
-        err && typeof err === "object" && "status" in err
-          ? Number((err as { status?: number }).status)
-          : NaN;
-      if (code.includes("invalid-verification-code")) {
-        setOtpError("Incorrect OTP. Please try again.");
-      } else if (code.includes("code-expired")) {
-        setOtpError("OTP expired. Please request a new one.");
-      } else if (status === 401) {
-        setOtpError(
-          "Registration was rejected while calling the server (session conflict). Close this dialog, refresh the page, and submit again.",
-        );
-      } else {
-        setOtpError(
-          (err as { message?: string })?.message || "Submission failed.",
-        );
-      }
+      setError(
+        (err as { message?: string })?.message ||
+          "Registration failed. Please try again.",
+      );
     } finally {
-      setOtpLoading(false);
       setLoading(false);
     }
   }
-
-  function closeOtp() {
-    setOtpOpen(false);
-    setOtpStep("send");
-    setConfirmation(null);
-    setOtp(Array(OTP_LEN).fill(""));
-    setOtpError("");
-    setOtpInfo("");
-    clearRecaptcha();
-  }
-
-  function changeOtp(i: number, val: string) {
-    const d = val.replace(/\D/g, "").slice(-1);
-    setOtp((prev) => {
-      const next = [...prev];
-      next[i] = d;
-      return next;
-    });
-    setOtpError("");
-    if (d && i < OTP_LEN - 1) otpRefs.current[i + 1]?.focus();
-  }
-
-  function keyDownOtp(i: number, e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Backspace") {
-      if (!otp[i] && i > 0) {
-        setOtp((prev) => {
-          const next = [...prev];
-          next[i - 1] = "";
-          return next;
-        });
-        otpRefs.current[i - 1]?.focus();
-      } else {
-        setOtp((prev) => {
-          const next = [...prev];
-          next[i] = "";
-          return next;
-        });
-      }
-    }
-    if (e.key === "ArrowLeft" && i > 0) otpRefs.current[i - 1]?.focus();
-    if (e.key === "ArrowRight" && i < OTP_LEN - 1) otpRefs.current[i + 1]?.focus();
-    if (e.key === "Enter" && otp.every((d) => d !== "")) void verifyAndSubmit();
-  }
-
-  function pasteOtp(e: React.ClipboardEvent) {
-    e.preventDefault();
-    const p = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, OTP_LEN);
-    if (!p) return;
-    const next = Array(OTP_LEN).fill("");
-    p.split("").forEach((d, idx) => {
-      next[idx] = d;
-    });
-    setOtp(next);
-    otpRefs.current[Math.min(p.length, OTP_LEN - 1)]?.focus();
-  }
-
-  const mm = String(Math.floor(timer / 60)).padStart(2, "0");
-  const ss = String(timer % 60).padStart(2, "0");
 
   return (
     <AuthPageBackground>
@@ -388,12 +199,15 @@ export default function RegisterPage() {
         {registrationSuccess ? (
           <Card className="border-success/30 bg-success/5 p-8 text-center shadow-elevated">
             <CheckCircle2 className="mx-auto mb-4 h-14 w-14 text-success" />
-            <h2 className="text-xl font-bold text-foreground">Vendor registration successful</h2>
+            <h2 className="text-xl font-bold text-foreground">Registration submitted</h2>
             <p className="mx-auto mt-3 max-w-md text-sm text-muted-foreground">
-              Your application has been submitted and is pending admin approval. You can use the
-              dashboard now while verification is in progress.
+              Your registration request has been submitted successfully. It will be reviewed and
+              approved within 24 hours.
             </p>
-            <p className="mt-4 text-xs text-muted-foreground">Redirecting to your dashboard…</p>
+            <p className="mx-auto mt-2 max-w-md text-xs text-muted-foreground">
+              Once approved, sign in from the vendor login screen using your mobile OTP.
+            </p>
+            <p className="mt-4 text-xs text-muted-foreground">Redirecting to the login screen…</p>
           </Card>
         ) : (
         <Card className="border-border/50 p-6 shadow-elevated sm:p-8">
@@ -401,8 +215,8 @@ export default function RegisterPage() {
             <section className="space-y-5">
               <h2 className="text-lg font-semibold text-foreground">Details</h2>
               <p className="text-sm text-muted-foreground">
-                Sign-in is via mobile OTP — no username or password to remember. We
-                will verify your phone at the end of this form.
+                Sign-in is via mobile OTP — no username or password to remember. After your
+                application is approved you will sign in with this mobile number.
               </p>
               <div className="grid gap-4 sm:grid-cols-2">
                 <FormField label="Owner Name *">
@@ -651,9 +465,8 @@ export default function RegisterPage() {
               <ReviewRow label="Account holder" value={bank.accountHolderName} />
               <ReviewRow label="Account number" value={bank.accountNumber} />
               <p className="pt-4 text-slate-600">
-                Submitting will verify your phone via OTP and create your vendor account.
-                Your application will be queued for admin approval — you can keep using
-                the dashboard while approval is pending.
+                Submitting will queue your application for admin approval. You will not be able to
+                sign in until an admin approves your registration — we&apos;ll review it within 24 hours.
               </p>
             </section>
           )}
@@ -670,90 +483,20 @@ export default function RegisterPage() {
                 <ArrowRight className="h-4 w-4" />
               </Button>
             ) : (
-              <Button type="button" onClick={() => void openOtpAndSend()} disabled={loading}>
-                {loading ? "Submitting…" : "Verify phone & Submit"}
+              <Button type="button" onClick={() => void submitRegistration()} disabled={loading} className="gap-2">
+                {loading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> Submitting…
+                  </>
+                ) : (
+                  "Submit Registration"
+                )}
               </Button>
             )}
           </div>
         </Card>
         )}
       </div>
-
-      <div id={RECAPTCHA_ID} className="sr-only" aria-hidden="true" />
-
-      <Dialog open={otpOpen} onOpenChange={(open) => !open && closeOtp()}>
-        <DialogContent className="max-w-sm rounded-2xl">
-          <DialogHeader>
-            <DialogTitle>Verify your phone</DialogTitle>
-          </DialogHeader>
-
-          {otpStep === "send" ? (
-            <div className="space-y-4 text-center">
-              <p className="text-sm text-muted-foreground">
-                We&apos;re sending a 6-digit OTP to{" "}
-                <span className="font-semibold text-foreground">{maskPhone(details.phone)}</span>.
-              </p>
-              {otpError ? (
-                <p className="text-sm text-destructive">{otpError}</p>
-              ) : (
-                <p className="text-xs text-muted-foreground">{otpLoading ? "Sending…" : "Initialising…"}</p>
-              )}
-              <Button type="button" onClick={() => void sendOtp()} disabled={otpLoading}>
-                {otpLoading ? "Sending…" : "Retry"}
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <p className="text-center text-sm text-muted-foreground">
-                Enter the code sent to{" "}
-                <span className="font-semibold text-foreground">{maskPhone(details.phone)}</span>
-              </p>
-              <p className="text-center text-sm font-semibold">{timer > 0 ? `${mm}:${ss}` : "00:00"}</p>
-
-              <OtpInputRow
-                otp={otp}
-                otpLen={OTP_LEN}
-                otpRefs={otpRefs}
-                error={Boolean(otpError)}
-                onChange={changeOtp}
-                onKeyDown={keyDownOtp}
-                onPaste={pasteOtp}
-              />
-
-              {otpError ? <p className="text-center text-sm text-destructive">{otpError}</p> : null}
-              {otpInfo ? <p className="text-center text-xs text-success">{otpInfo}</p> : null}
-
-              <Button
-                type="button"
-                className="h-12 w-full"
-                onClick={() => void verifyAndSubmit()}
-                disabled={otpLoading || otp.some((d) => d === "")}
-              >
-                {otpLoading ? "Verifying & registering…" : "Verify & Submit"}
-              </Button>
-
-              <div className="flex items-center justify-between text-xs">
-                <button
-                  type="button"
-                  onClick={closeOtp}
-                  className="text-muted-foreground hover:text-foreground hover:underline"
-                  disabled={otpLoading}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void resend()}
-                  disabled={timer > 0 || otpLoading}
-                  className="font-semibold text-primary hover:underline disabled:opacity-50"
-                >
-                  {timer > 0 ? `Resend OTP in ${timer}s` : "Resend OTP"}
-                </button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
     </AuthPageBackground>
   );
 }
