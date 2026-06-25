@@ -108,30 +108,26 @@ export default function VendorBusinessProfileView() {
       setMe(profile);
 
       if (profile.source === "catalog") {
-        const [planRes, ordersRes] = await Promise.all([
-          vendorPlanApi.get().catch(() => null),
-          vendorOrdersApi.list({ limit: 100, offset: 0 }).catch(() => null),
-        ]);
+        const isProductVendor = String(profile.vendorType || "").toUpperCase() === "PRODUCT";
+        const planRes = await vendorPlanApi.get().catch(() => null);
         setPlanInfo(planRes);
 
-        if (ordersRes) {
-          setOrderTotal(ordersRes.total);
-          let sum = 0;
-          for (const o of ordersRes.items) {
-            sum += parseFloat(String(o.totalAmount || "0")) || 0;
-          }
-          setRevenue(sum);
-        } else {
-          setOrderTotal(0);
-          setRevenue(0);
-        }
-
-        if (String(profile.vendorType || "").toUpperCase() === "PRODUCT") {
-          const pr = await vendorCatalogApi.listProducts({ limit: 1, offset: 0, status: "all" }).catch(() => null);
+        if (isProductVendor) {
+          const [ordersRes, pr] = await Promise.all([
+            vendorOrdersApi.list({ limit: 100, offset: 0 }).catch(() => null),
+            vendorCatalogApi.listProducts({ limit: 1, offset: 0, status: "all" }).catch(() => null),
+          ]);
+          setOrderTotal(ordersRes?.total ?? 0);
+          setRevenue(ordersRes?.items.reduce((sum, order) => sum + (parseFloat(String(order.totalAmount || "0")) || 0), 0) ?? 0);
           setProductTotal(pr?.total ?? 0);
           setServiceSubtitle("");
         } else {
-          const offerings = await vendorOfferedServicesApi.listOfferings().catch(() => []);
+          const [bookingsRes, offerings] = await Promise.all([
+            vendorBookingsApi.list({ limit: 100, offset: 0 }).catch(() => null),
+            vendorOfferedServicesApi.listOfferings().catch(() => []),
+          ]);
+          setOrderTotal(bookingsRes?.total ?? 0);
+          setRevenue(bookingsRes?.items.reduce((sum, booking) => sum + bookingAmount(booking), 0) ?? 0);
           const fromOfferings = offerings
             .map((o) => String(o.catalogName || o.metadata?.displayName || "").trim())
             .filter(Boolean);
