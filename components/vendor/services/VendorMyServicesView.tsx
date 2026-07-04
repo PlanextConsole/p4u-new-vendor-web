@@ -1,11 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MoreVertical, Plus, Search, Wrench } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { FileImage, ImageIcon, IndianRupee, MoreVertical, Plus, Search, Wrench, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getVendorMe, type VendorProfile } from "@/lib/api/vendor";
 import {
@@ -18,6 +15,7 @@ import {
 import { vendorUploadImage } from "@/lib/api/vendorUpload";
 import { formatInr } from "@/lib/vendor/profileDisplay";
 import { resolveMediaUrl } from "@/lib/media";
+import MediaLibraryPicker from "@/components/vendor/media/MediaLibraryPicker";
 
 const PRICE_TYPES: { value: PriceType; label: string }[] = [
   { value: "fixed", label: "Fixed" },
@@ -55,6 +53,7 @@ function errMessage(e: unknown): string {
 type StatusFilter = "all" | "active" | "inactive" | "pending";
 
 type FormState = {
+  categoryId: string;
   serviceId: string;
   price: string;
   isActive: boolean;
@@ -71,6 +70,7 @@ type FormState = {
 };
 
 const emptyForm: FormState = {
+  categoryId: "",
   serviceId: "",
   price: "",
   isActive: true,
@@ -88,9 +88,11 @@ const emptyForm: FormState = {
 
 function formFromRow(row: VendorServiceOfferingRow): FormState {
   const m = row.metadata || {};
+  const price = String(row.price ?? "");
   return {
+    categoryId: row.categoryId || "",
     serviceId: row.serviceId,
-    price: String(row.price ?? ""),
+    price,
     isActive: row.isActive,
     availability: row.isAvailable ? "Yes" : "No",
     displayName: metaStr(m, "displayName"),
@@ -98,7 +100,7 @@ function formFromRow(row: VendorServiceOfferingRow): FormState {
     iconUrl: metaStr(m, "vendorIconUrl") || row.catalogIconUrl || "",
     trending: m.trending === true ? "Yes" : "No",
     emergency: m.emergency === true ? "Yes" : "No",
-    basePrice: metaStr(m, "referenceBasePrice"),
+    basePrice: metaStr(m, "referenceBasePrice") || price,
     priceType: (metaStr(m, "priceType") as PriceType) || "fixed",
     duration: metaStr(m, "duration"),
     city: metaStr(m, "city"),
@@ -106,9 +108,10 @@ function formFromRow(row: VendorServiceOfferingRow): FormState {
 }
 
 function bodyFromForm(f: FormState, opts: { includeServiceId: boolean }) {
+  const basePrice = f.basePrice.trim();
   return {
     ...(opts.includeServiceId ? { serviceId: f.serviceId } : {}),
-    price: f.price.trim(),
+    price: basePrice,
     isActive: f.isActive,
     isAvailable: f.availability === "Yes",
     displayName: f.displayName.trim() || null,
@@ -116,7 +119,7 @@ function bodyFromForm(f: FormState, opts: { includeServiceId: boolean }) {
     iconUrl: f.iconUrl.trim() || null,
     trending: f.trending === "Yes",
     emergency: f.emergency === "Yes",
-    basePrice: f.basePrice.trim() || null,
+    basePrice: basePrice || null,
     priceType: f.priceType,
     duration: f.duration.trim() || null,
     city: f.city.trim() || null,
@@ -141,6 +144,8 @@ export default function VendorMyServicesView() {
   const [form, setForm] = useState<FormState>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [iconUploading, setIconUploading] = useState(false);
+  const [activeTab, setActiveTab] = useState<"general" | "pricing" | "descriptions">("general");
+  const [mediaLibraryOpen, setMediaLibraryOpen] = useState(false);
 
   const isServiceVendor = String(me?.vendorType || "").toUpperCase() === "SERVICE";
 
@@ -182,16 +187,10 @@ export default function VendorMyServicesView() {
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
-  const categoryNameById = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const c of categories) m.set(c.id, c.name);
-    return m;
-  }, [categories]);
-
-  const selectedCatalogItem = useMemo(
-    () => catalog.find((c) => c.id === form.serviceId) ?? null,
-    [catalog, form.serviceId],
-  );
+  const catalogForCategory = useMemo(() => {
+    if (!form.categoryId) return [];
+    return catalog.filter((c) => c.serviceCategoryId === form.categoryId);
+  }, [catalog, form.categoryId]);
 
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase();
@@ -210,6 +209,7 @@ export default function VendorMyServicesView() {
     setEditingId(null);
     setEditingListingPending(false);
     setForm(emptyForm);
+    setActiveTab("general");
     setModal("add");
   }
 
@@ -217,6 +217,7 @@ export default function VendorMyServicesView() {
     setEditingId(row.id);
     setEditingListingPending(String(row.moderationStatus || "approved").toLowerCase() === "pending");
     setForm(formFromRow(row));
+    setActiveTab("general");
     setModal("edit");
     setMenuOpenId(null);
   }
@@ -237,13 +238,25 @@ export default function VendorMyServicesView() {
     }
   }
 
+  function goToNextTab() {
+    if (activeTab === "general") setActiveTab("pricing");
+    else if (activeTab === "pricing") setActiveTab("descriptions");
+  }
   async function submitForm() {
-    if (!form.serviceId.trim() && modal === "add") {
-      setErr("Select a catalog service.");
+    if (!form.categoryId.trim() && modal === "add") {
+      setErr("Select service category.");
       return;
     }
-    if (!form.price.trim()) {
-      setErr("Enter your price (₹).");
+    if (!form.serviceId.trim() && modal === "add") {
+      setErr("Select subcategory.");
+      return;
+    }
+    if (!form.displayName.trim()) {
+      setErr("Enter service title.");
+      return;
+    }
+    if (!form.basePrice.trim()) {
+      setErr("Enter base price.");
       return;
     }
     setSaving(true);
@@ -326,7 +339,7 @@ export default function VendorMyServicesView() {
           <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
             Admin approving your <strong className="font-semibold text-foreground">service vendor</strong> account does
             not create listings here. Each row is a <strong className="font-semibold text-foreground">link</strong> between
-            your business and a catalog service template — use <strong className="font-semibold text-foreground">Add Service</strong>{" "}
+            your business and a catalog service template - use <strong className="font-semibold text-foreground">Add Service</strong>{" "}
             to choose a template, set your price, and submit for review when required.
           </p>
         </div>
@@ -345,7 +358,7 @@ export default function VendorMyServicesView() {
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search services…"
+            placeholder="Search services..."
             className="w-full rounded-xl border border-border bg-card py-3 pl-11 pr-4 text-base text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/50 focus:ring-2 focus:ring-primary/20"
           />
         </div>
@@ -361,7 +374,7 @@ export default function VendorMyServicesView() {
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </select>
-          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">▾</span>
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">v</span>
         </div>
       </div>
 
@@ -409,7 +422,7 @@ export default function VendorMyServicesView() {
                   ) : null}
                 </div>
                 <p className="mt-1 text-base font-semibold text-foreground">{formatInr(priceNum)}</p>
-                {(duration || city) && <p className="mt-1 text-sm text-muted-foreground">{[duration, city].filter(Boolean).join(" · ")}</p>}
+                {(duration || city) && <p className="mt-1 text-sm text-muted-foreground">{[duration, city].filter(Boolean).join(" - ")}</p>}
               </div>
               <div className="relative shrink-0" ref={menuOpenId === row.id ? menuRef : undefined}>
                 <button
@@ -472,270 +485,256 @@ export default function VendorMyServicesView() {
 
       {modal ? (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 p-4 sm:p-6"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/45 p-0 sm:p-6"
           onClick={() => !saving && setModal(null)}
           role="presentation"
         >
           <div
-            className="max-h-[min(92vh,900px)] w-full max-w-2xl overflow-y-auto rounded-2xl bg-card p-6 shadow-2xl sm:p-8"
+            className="max-h-screen w-full overflow-y-auto bg-card p-6 shadow-2xl sm:max-h-[min(92vh,900px)] sm:max-w-6xl sm:rounded-2xl sm:p-8"
             role="dialog"
             aria-modal="true"
             aria-labelledby="svc-modal-title"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 id="svc-modal-title" className="text-xl font-bold text-foreground">
-              {modal === "add" ? "Add service" : "Edit service"}
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Matches admin catalog service fields: template name and category are fixed; you set price, overrides, and
-              listing options. Your customer price is required below.
-            </p>
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+                  <Wrench className="h-7 w-7" aria-hidden />
+                </span>
+                <h2 id="svc-modal-title" className="text-lg font-bold text-foreground">
+                  {modal === "add" ? "New Service" : "Edit Service"}
+                </h2>
+              </div>
+              <button
+                type="button"
+                className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="Close"
+                disabled={saving}
+                onClick={() => setModal(null)}
+              >
+                <X className="h-7 w-7" aria-hidden />
+              </button>
+            </div>
 
             {editingListingPending ? (
               <div className="mt-4 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-foreground">
-                This listing is <strong>pending admin approval</strong>. You can edit details below; it appears in the public
-                services catalog only after an administrator approves it. Availability and “listing active” are locked
-                until then.
+                This listing is pending admin approval. It will reflect on the user service flow after admin approval.
               </div>
             ) : null}
 
-            <div className="mt-6 grid gap-4 sm:grid-cols-2">
-              <label className={modal === "edit" ? "sm:col-span-2 opacity-60" : "sm:col-span-2"}>
-                <span className="text-sm font-semibold text-foreground">Catalog service *</span>
-                <select
-                  className="mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed"
-                  value={form.serviceId}
-                  disabled={modal === "edit"}
-                  onChange={(e) => setForm((f) => ({ ...f, serviceId: e.target.value }))}
+            <div className="mt-6 flex rounded-2xl bg-muted p-2">
+              {[
+                ["general", "General"],
+                ["pricing", "Pricing & Slots"],
+                ["descriptions", "Descriptions"],
+              ].map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={`rounded-xl px-5 py-3 text-sm font-bold transition ${activeTab === key ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                  onClick={() => setActiveTab(key as "general" | "pricing" | "descriptions")}
                 >
-                  <option value="">Select…</option>
-                  {catalog.map((c) => {
-                    const cn = c.serviceCategoryId ? categoryNameById.get(c.serviceCategoryId) || "—" : "—";
-                    return (
-                      <option key={c.id} value={c.id}>
-                        {c.name} ({cn})
-                      </option>
-                    );
-                  })}
-                </select>
-              </label>
-
-              {selectedCatalogItem ? (
-                <div className="sm:col-span-2 rounded-xl border border-border bg-muted/50 p-4 text-sm text-foreground">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Catalog template (same as admin “service name” + category)
-                  </p>
-                  <p className="mt-2 text-base font-semibold text-foreground">{selectedCatalogItem.name}</p>
-                  <p className="mt-1 text-muted-foreground">
-                    Category:{" "}
-                    <span className="text-foreground">
-                      {selectedCatalogItem.serviceCategoryId
-                        ? categoryNameById.get(selectedCatalogItem.serviceCategoryId) || "—"
-                        : "—"}
-                    </span>
-                  </p>
-                  {selectedCatalogItem.description ? (
-                    <p className="mt-3 max-h-28 overflow-y-auto whitespace-pre-wrap text-muted-foreground">
-                      {selectedCatalogItem.description}
-                    </p>
-                  ) : (
-                    <p className="mt-2 text-xs text-muted-foreground">No catalog description on this template.</p>
-                  )}
-                  {selectedCatalogItem.basePrice != null && String(selectedCatalogItem.basePrice).trim() !== "" ? (
-                    <p className="mt-3 text-xs text-muted-foreground">
-                      Catalog base price (reference): ₹{String(selectedCatalogItem.basePrice)}
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
-
-              <label className="sm:col-span-2">
-                <span className="text-sm font-semibold text-foreground">Display name (optional)</span>
-                <input
-                  className="mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                  value={form.displayName}
-                  onChange={(e) => setForm((f) => ({ ...f, displayName: e.target.value }))}
-                  placeholder="Overrides catalog name in your listings"
-                />
-              </label>
-
-              <label className="sm:col-span-2">
-                <span className="text-sm font-semibold text-foreground">Description</span>
-                <textarea
-                  className="mt-2 min-h-[100px] w-full rounded-xl border border-border px-4 py-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                  value={form.description}
-                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                  placeholder="What the customer gets"
-                />
-              </label>
-
-              <div className="sm:col-span-2 space-y-2">
-                <span className="text-sm font-semibold text-foreground">Icon / image</span>
-                <div className="flex flex-wrap items-center gap-3">
-                  <label className="inline-flex cursor-pointer items-center rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="sr-only"
-                      disabled={iconUploading || saving}
-                      onChange={(ev) => void onServiceIconFile(ev)}
-                    />
-                    {iconUploading ? "Uploading…" : "Choose image"}
-                  </label>
-                  {form.iconUrl ? (
-                    <button
-                      type="button"
-                      className="text-sm text-destructive hover:underline"
-                      disabled={saving}
-                      onClick={() => setForm((f) => ({ ...f, iconUrl: "" }))}
-                    >
-                      Remove
-                    </button>
-                  ) : null}
-                </div>
-                {form.iconUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={mediaUrl(form.iconUrl)}
-                    alt=""
-                    className="mt-2 h-16 w-16 rounded-lg border border-border object-cover"
-                  />
-                ) : (
-                  <p className="text-xs text-muted-foreground">Square image recommended — JPEG, PNG, WebP, up to 8 MB.</p>
-                )}
-              </div>
-
-              <label>
-                <span className="text-sm font-semibold text-foreground">Your price (₹) *</span>
-                <input
-                  className="mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                  inputMode="decimal"
-                  value={form.price}
-                  onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))}
-                  placeholder="e.g. 499"
-                />
-              </label>
-
-              <label>
-                <span className="text-sm font-semibold text-foreground">Reference base price (optional)</span>
-                <input
-                  className="mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                  value={form.basePrice}
-                  onChange={(e) => setForm((f) => ({ ...f, basePrice: e.target.value }))}
-                  placeholder="Shown as reference only"
-                />
-              </label>
-
-              <label>
-                <span className="text-sm font-semibold text-foreground">Price type</span>
-                <select
-                  className="mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                  value={form.priceType}
-                  onChange={(e) => setForm((f) => ({ ...f, priceType: e.target.value as PriceType }))}
-                >
-                  {PRICE_TYPES.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label>
-                <span className="text-sm font-semibold text-foreground">Duration</span>
-                <input
-                  className="mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                  value={form.duration}
-                  onChange={(e) => setForm((f) => ({ ...f, duration: e.target.value }))}
-                  placeholder="e.g. 1–2 hours"
-                />
-              </label>
-
-              <label>
-                <span className="text-sm font-semibold text-foreground">City / area</span>
-                <input
-                  className="mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                  value={form.city}
-                  onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
-                  placeholder="e.g. Coimbatore"
-                />
-              </label>
-
-              <label>
-                <span className="text-sm font-semibold text-foreground">Availability</span>
-                <select
-                  className="mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted/50"
-                  value={form.availability}
-                  disabled={editingListingPending}
-                  onChange={(e) => setForm((f) => ({ ...f, availability: e.target.value }))}
-                >
-                  {YES_NO.map((o) => (
-                    <option key={o} value={o}>
-                      {o}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label>
-                <span className="text-sm font-semibold text-foreground">Trending</span>
-                <select
-                  className="mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                  value={form.trending}
-                  onChange={(e) => setForm((f) => ({ ...f, trending: e.target.value }))}
-                >
-                  {YES_NO.map((o) => (
-                    <option key={o} value={o}>
-                      {o}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label>
-                <span className="text-sm font-semibold text-foreground">Emergency service</span>
-                <select
-                  className="mt-2 w-full rounded-xl border border-border px-4 py-3 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-                  value={form.emergency}
-                  onChange={(e) => setForm((f) => ({ ...f, emergency: e.target.value }))}
-                >
-                  {YES_NO.map((o) => (
-                    <option key={o} value={o}>
-                      {o}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="flex items-center gap-3 sm:col-span-2">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-border text-primary focus:ring-primary disabled:cursor-not-allowed"
-                  checked={form.isActive}
-                  disabled={editingListingPending}
-                  onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
-                />
-                <span className="text-sm font-semibold text-foreground">Listing active (visible when approved)</span>
-              </label>
+                  {label}
+                </button>
+              ))}
             </div>
 
-            <div className="mt-8 flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => setModal(null)}
-                className="rounded-xl border border-border px-5 py-2.5 text-sm font-semibold text-foreground hover:bg-muted"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => void submitForm()}
-                className="rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-primary/90 disabled:opacity-60"
-              >
-                {saving ? "Saving…" : modal === "add" ? "Save" : "Update"}
-              </button>
+            <div className="mt-6">
+              {activeTab === "general" ? (
+                <section className="space-y-6">
+                  <div className="rounded-2xl border border-border bg-muted/20 p-5">
+                    <h3 className="flex items-center gap-2 text-2xl font-bold text-cyan-700">
+                      <ImageIcon className="h-6 w-6" aria-hidden />
+                      Service Image
+                    </h3>
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      <label className="inline-flex cursor-pointer items-center rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground hover:bg-muted">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="sr-only"
+                          disabled={iconUploading || saving}
+                          onChange={(ev) => void onServiceIconFile(ev)}
+                        />
+                        {iconUploading ? "Uploading..." : "Choose file"}
+                      </label>
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-3 text-sm font-bold text-foreground hover:bg-muted"
+                        disabled={saving}
+                        onClick={() => setMediaLibraryOpen(true)}
+                      >
+                        <FileImage className="h-4 w-4" aria-hidden />
+                        Media Library
+                      </button>
+                      {form.iconUrl ? (
+                        <button
+                          type="button"
+                          className="rounded-xl border border-destructive/30 px-4 py-3 text-sm font-bold text-destructive hover:bg-destructive/10"
+                          disabled={saving}
+                          onClick={() => setForm((f) => ({ ...f, iconUrl: "" }))}
+                        >
+                          Remove
+                        </button>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      className="mt-4 flex min-h-44 w-full items-center justify-center rounded-2xl border border-dashed border-cyan-200 bg-card text-center text-muted-foreground"
+                      disabled={saving}
+                      onClick={() => setMediaLibraryOpen(true)}
+                    >
+                      {form.iconUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={mediaUrl(form.iconUrl)} alt="" className="max-h-40 rounded-xl object-cover" />
+                      ) : (
+                        <span>
+                          <ImageIcon className="mx-auto mb-2 h-6 w-6" aria-hidden />
+                          <span className="block font-medium">Upload Service Image</span>
+                          <span className="mt-2 block text-sm">Click to open Media Library</span>
+                        </span>
+                      )}
+                    </button>
+                    <MediaLibraryPicker
+                      open={mediaLibraryOpen}
+                      onClose={() => setMediaLibraryOpen(false)}
+                      onSelect={(url) => setForm((f) => ({ ...f, iconUrl: url }))}
+                    />
+                  </div>
+
+                  <label className="block">
+                    <span className="text-sm font-bold text-muted-foreground">Title *</span>
+                    <input
+                      className="mt-2 w-full rounded-xl border border-border px-5 py-4 text-base text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+                      value={form.displayName}
+                      onChange={(e) => setForm((f) => ({ ...f, displayName: e.target.value }))}
+                      placeholder="Service name"
+                      maxLength={255}
+                    />
+                  </label>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <label className="block">
+                      <span className="text-sm font-bold text-muted-foreground">Service category *</span>
+                      <select
+                        className="mt-2 w-full rounded-xl border border-border bg-card px-4 py-4 text-base text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted"
+                        value={form.categoryId}
+                        disabled={modal === "edit"}
+                        onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value, serviceId: "" }))}
+                      >
+                        <option value="">Select category</option>
+                        {categories.map((c) => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="block">
+                      <span className="text-sm font-bold text-muted-foreground">Subcategory *</span>
+                      <select
+                        className="mt-2 w-full rounded-xl border border-border bg-card px-4 py-4 text-base text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 disabled:cursor-not-allowed disabled:bg-muted"
+                        value={form.serviceId}
+                        disabled={modal === "edit" || !form.categoryId}
+                        onChange={(e) => {
+                          const serviceId = e.target.value;
+                          const item = catalog.find((c) => c.id === serviceId);
+                          const meta = item?.metadata || {};
+                          setForm((f) => ({
+                            ...f,
+                            serviceId,
+                            displayName: item?.name || f.displayName,
+                            description: item?.description || f.description,
+                            iconUrl: item?.iconUrl || f.iconUrl,
+                            basePrice: item?.basePrice != null ? String(item.basePrice) : f.basePrice,
+                            price: item?.basePrice != null ? String(item.basePrice) : f.price,
+                            availability: item?.availability ? "Yes" : f.availability,
+                            trending: item?.trending ? "Yes" : f.trending,
+                            emergency: meta.emergency === true ? "Yes" : f.emergency,
+                            priceType: meta.priceType === "starting_from" || meta.priceType === "hourly" || meta.priceType === "fixed" ? meta.priceType : f.priceType,
+                            duration: typeof meta.duration === "string" ? meta.duration : f.duration,
+                          }));
+                        }}
+                      >
+                        <option value="">{form.categoryId ? "Select subcategory" : "Select category first"}</option>
+                        {catalogForCategory.map((c) => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <label className="block">
+                      <span className="text-sm font-bold text-muted-foreground">Availability</span>
+                      <select className="mt-2 w-full rounded-xl border border-border bg-card px-4 py-4 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" value={form.availability} disabled={editingListingPending} onChange={(e) => setForm((f) => ({ ...f, availability: e.target.value }))}>
+                        {YES_NO.map((o) => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                    </label>
+                    <label className="block">
+                      <span className="text-sm font-bold text-muted-foreground">Trending</span>
+                      <select className="mt-2 w-full rounded-xl border border-border bg-card px-4 py-4 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" value={form.trending} onChange={(e) => setForm((f) => ({ ...f, trending: e.target.value }))}>
+                        {YES_NO.map((o) => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                    </label>
+                    <label className="block">
+                      <span className="text-sm font-bold text-muted-foreground">Emergency service</span>
+                      <select className="mt-2 w-full rounded-xl border border-border bg-card px-4 py-4 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" value={form.emergency} onChange={(e) => setForm((f) => ({ ...f, emergency: e.target.value }))}>
+                        {YES_NO.map((o) => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                    </label>
+                  </div>
+                </section>
+              ) : null}
+
+              {activeTab === "pricing" ? (
+                <section className="rounded-2xl border border-border bg-muted/20 p-5">
+                  <h3 className="flex items-center gap-2 text-base font-bold text-foreground">
+                    <IndianRupee className="h-4 w-4" aria-hidden />
+                    Base Pricing
+                  </h3>
+                  <div className="mt-5 grid gap-4 md:grid-cols-3">
+                    <label className="block">
+                      <span className="text-sm font-bold text-muted-foreground">Base Price (â‚¹)</span>
+                      <input className="mt-2 w-full rounded-xl border border-border px-5 py-4 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" inputMode="decimal" value={form.basePrice} onChange={(e) => setForm((f) => ({ ...f, basePrice: e.target.value, price: e.target.value }))} placeholder="e.g. 499" />
+                    </label>
+                    <label className="block">
+                      <span className="text-sm font-bold text-muted-foreground">Price type</span>
+                      <select className="mt-2 w-full rounded-xl border border-border bg-card px-4 py-4 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" value={form.priceType} onChange={(e) => setForm((f) => ({ ...f, priceType: e.target.value as PriceType }))}>
+                        {PRICE_TYPES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </select>
+                    </label>
+                    <label className="block">
+                      <span className="text-sm font-bold text-muted-foreground">Duration</span>
+                      <input className="mt-2 w-full rounded-xl border border-border px-5 py-4 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" value={form.duration} onChange={(e) => setForm((f) => ({ ...f, duration: e.target.value }))} placeholder="e.g. 1-2 hours" maxLength={64} />
+                    </label>
+                  </div>
+                </section>
+              ) : null}
+
+              {activeTab === "descriptions" ? (
+                <section className="rounded-2xl border border-border bg-muted/20 p-5">
+                  <label className="block">
+                    <span className="text-sm font-bold text-muted-foreground">Description</span>
+                    <textarea className="mt-3 min-h-44 w-full rounded-xl border border-border px-5 py-4 text-base outline-none focus:border-primary focus:ring-2 focus:ring-primary/20" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Service description..." />
+                  </label>
+                </section>
+              ) : null}
+            </div>
+
+            <div className="mt-6 border-t border-border pt-5">
+              <div className="flex flex-wrap justify-end gap-3">
+                <button type="button" disabled={saving} onClick={() => setModal(null)} className="rounded-xl border border-border px-6 py-3 text-sm font-bold text-foreground hover:bg-muted">
+                  Cancel
+                </button>
+                {activeTab !== "descriptions" ? (
+                  <button type="button" disabled={saving} onClick={goToNextTab} className="rounded-xl bg-primary px-6 py-3 text-sm font-bold text-white hover:bg-primary/90 disabled:opacity-60">
+                    Next
+                  </button>
+                ) : (
+                  <button type="button" disabled={saving} onClick={() => void submitForm()} className="rounded-xl bg-primary px-6 py-3 text-sm font-bold text-white hover:bg-primary/90 disabled:opacity-60">
+                    {saving ? "Saving..." : modal === "add" ? "Create Service" : "Save"}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

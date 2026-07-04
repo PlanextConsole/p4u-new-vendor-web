@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, CalendarDays, DollarSign, Search } from "lucide-react";
 import type { VendorSettlementRow } from "@/lib/api/vendorSettlements";
 import { vendorSettlementsApi } from "@/lib/api/vendorSettlements";
+import { vendorBookingsApi } from "@/lib/api/vendorBookings";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -15,6 +16,7 @@ import {
   VendorStatusBadge,
 } from "@/components/vendor/VendorListUi";
 import {
+  completedBookingsAsPendingSettlements,
   displaySettlementRef,
   formatInr,
   formatListDayMonthYear,
@@ -27,6 +29,38 @@ import {
 import { cn } from "@/lib/utils";
 
 const PER_PAGE = 10;
+function rowMatchesSearch(row: VendorSettlementRow, q: string): boolean {
+  const needle = q.trim().toLowerCase();
+  if (!needle) return true;
+  const md = metaRecord(row.metadata);
+  const haystack = [
+    row.id,
+    row.orderId || "",
+    displaySettlementRef(row),
+    orderRefFromRow(row),
+    typeof md.serviceName === "string" ? md.serviceName : "",
+    typeof md.bookingId === "string" ? md.bookingId : "",
+  ]
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(needle);
+}
+
+function rowInDateRange(row: VendorSettlementRow, from: string, to: string): boolean {
+  const raw = row.createdAt || row.updatedAt || "";
+  if (!raw) return true;
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return true;
+  if (from) {
+    const start = new Date(`${from}T00:00:00`);
+    if (!Number.isNaN(start.getTime()) && d < start) return false;
+  }
+  if (to) {
+    const end = new Date(`${to}T23:59:59`);
+    if (!Number.isNaN(end.getTime()) && d > end) return false;
+  }
+  return true;
+}
 
 export default function VendorPaymentHistoryView() {
   const [items, setItems] = useState<VendorSettlementRow[]>([]);
@@ -56,8 +90,15 @@ export default function VendorPaymentHistoryView() {
 
   const loadStats = useCallback(async () => {
     try {
-      const res = await vendorSettlementsApi.list({ ...filterParams, limit: 500, offset: 0 });
-      setStatsItems(res.items || []);
+      const [settlementsRes, completedBookingsRes] = await Promise.all([
+        vendorSettlementsApi.list({ ...filterParams, limit: 500, offset: 0 }),
+        vendorBookingsApi.list({ status: "completed", limit: 500, offset: 0 }),
+      ]);
+      const settlements = settlementsRes.items || [];
+      const bookingSettlements = completedBookingsAsPendingSettlements(completedBookingsRes.items || [], settlements).filter(
+        (row) => rowMatchesSearch(row, filterParams.q || "") && rowInDateRange(row, filterParams.from || "", filterParams.to || ""),
+      );
+      setStatsItems([...settlements, ...bookingSettlements]);
     } catch {
       setStatsItems([]);
     }
@@ -68,9 +109,19 @@ export default function VendorPaymentHistoryView() {
     setErr("");
     try {
       const offset = (page - 1) * PER_PAGE;
-      const res = await vendorSettlementsApi.list({ ...filterParams, limit: PER_PAGE, offset });
-      setItems(res.items || []);
-      setTotal(res.total ?? res.items?.length ?? 0);
+      const [settlementsRes, completedBookingsRes] = await Promise.all([
+        vendorSettlementsApi.list({ ...filterParams, limit: 500, offset: 0 }),
+        vendorBookingsApi.list({ status: "completed", limit: 500, offset: 0 }),
+      ]);
+      const settlements = settlementsRes.items || [];
+      const bookingSettlements = completedBookingsAsPendingSettlements(completedBookingsRes.items || [], settlements).filter(
+        (row) => rowMatchesSearch(row, filterParams.q || "") && rowInDateRange(row, filterParams.from || "", filterParams.to || ""),
+      );
+      const merged = [...settlements, ...bookingSettlements].sort(
+        (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime(),
+      );
+      setItems(merged.slice(offset, offset + PER_PAGE));
+      setTotal(merged.length);
     } catch (e: unknown) {
       setErr(
         e && typeof e === "object" && "message" in e ? String((e as { message: string }).message) : "Failed to load payment history",
@@ -203,7 +254,7 @@ export default function VendorPaymentHistoryView() {
                     <div className="shrink-0 text-right">
                       <p className={cn("text-sm font-bold", isSettled && "text-success")}>{formatInr(row.amount)}</p>
                       <p className="mt-0.5 text-[10px] text-muted-foreground">
-                        Gross: {formatInr(gross)} · Comm: {formatInr(commission)}
+                        Gross: {formatInr(gross)} / Comm: {formatInr(commission)}
                       </p>
                       {settledWhen ? <p className="mt-0.5 text-[10px] text-success">Settled: {settledWhen}</p> : null}
                     </div>

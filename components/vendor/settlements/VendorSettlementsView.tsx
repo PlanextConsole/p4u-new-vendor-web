@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Clock3, DollarSign, XCircle } from "lucide-react";
 import type { VendorSettlementRow } from "@/lib/api/vendorSettlements";
 import { vendorSettlementsApi } from "@/lib/api/vendorSettlements";
+import { vendorBookingsApi } from "@/lib/api/vendorBookings";
 import { Card } from "@/components/ui/card";
 import {
   VendorListEmpty,
@@ -14,6 +15,7 @@ import {
   VendorStatusBadge,
 } from "@/components/vendor/VendorListUi";
 import {
+  completedBookingsAsPendingSettlements,
   displaySettlementRef,
   formatInr,
   formatShortDate,
@@ -36,8 +38,13 @@ export default function VendorSettlementsView() {
 
   const loadStats = useCallback(async () => {
     try {
-      const res = await vendorSettlementsApi.list({ limit: 500, offset: 0 });
-      setStatsRows(res.items || []);
+      const [settlementsRes, completedBookingsRes] = await Promise.all([
+        vendorSettlementsApi.list({ limit: 500, offset: 0 }),
+        vendorBookingsApi.list({ status: "completed", limit: 500, offset: 0 }),
+      ]);
+      const settlements = settlementsRes.items || [];
+      const bookingSettlements = completedBookingsAsPendingSettlements(completedBookingsRes.items || [], settlements);
+      setStatsRows([...settlements, ...bookingSettlements]);
     } catch {
       setStatsRows([]);
     }
@@ -48,13 +55,17 @@ export default function VendorSettlementsView() {
     setErr("");
     try {
       const offset = (page - 1) * PER_PAGE;
-      const res = await vendorSettlementsApi.list({
-        status: statusFilter || undefined,
-        limit: PER_PAGE,
-        offset,
-      });
-      setItems(res.items || []);
-      setTotal(res.total ?? res.items?.length ?? 0);
+      const [settlementsRes, completedBookingsRes] = await Promise.all([
+        vendorSettlementsApi.list({ limit: 500, offset: 0 }),
+        vendorBookingsApi.list({ status: "completed", limit: 500, offset: 0 }),
+      ]);
+      const settlements = settlementsRes.items || [];
+      const bookingSettlements = completedBookingsAsPendingSettlements(completedBookingsRes.items || [], settlements);
+      const merged = [...settlements, ...bookingSettlements]
+        .filter((row) => !statusFilter || row.status.toLowerCase() === statusFilter.toLowerCase())
+        .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+      setItems(merged.slice(offset, offset + PER_PAGE));
+      setTotal(merged.length);
     } catch (e: unknown) {
       setErr(
         e && typeof e === "object" && "message" in e ? String((e as { message: string }).message) : "Failed to load settlements",
@@ -166,7 +177,7 @@ export default function VendorSettlementsView() {
               (typeof md.transactionRef === "string" && md.transactionRef) ||
               (typeof md.txn === "string" && md.txn) ||
               (typeof md.bankTxnId === "string" && md.bankTxnId) ||
-              "—";
+              "-";
             const { gross, commission } = grossAndCommission(row);
             const settledLabel =
               row.status.toLowerCase() === "settled" || row.status.toLowerCase() === "completed"
@@ -191,7 +202,7 @@ export default function VendorSettlementsView() {
                         <VendorStatusBadge status={row.status} kind="settlement" />
                       </div>
                       <p className="mt-0.5 text-xs text-muted-foreground">Order: {orderRef}</p>
-                      {txn !== "—" ? (
+                      {txn !== "-" ? (
                         <p className="text-xs text-muted-foreground">
                           Txn: <span className="font-mono">{txn}</span>
                         </p>

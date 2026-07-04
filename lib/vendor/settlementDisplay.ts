@@ -1,4 +1,5 @@
 import type { VendorSettlementRow } from "@/lib/api/vendorSettlements";
+import type { VendorBookingRow } from "@/lib/api/vendorBookings";
 
 export function metaRecord(m: unknown): Record<string, unknown> {
   if (!m || typeof m !== "object" || Array.isArray(m)) return {};
@@ -28,22 +29,22 @@ export function orderRefFromRow(row: VendorSettlementRow): string {
   return (
     (typeof md.orderRef === "string" && md.orderRef) ||
     (typeof md.order_ref === "string" && md.order_ref) ||
-    (row.orderId ? `Order #${row.orderId.slice(0, 8)}` : "—")
+    (row.orderId ? `Order #${row.orderId.slice(0, 8)}` : "-")
   );
 }
 
 export function formatShortDate(iso?: string): string {
-  if (!iso) return "—";
+  if (!iso) return "-";
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return "-";
   return d.toLocaleDateString("en-IN", { day: "numeric", month: "numeric", year: "numeric" });
 }
 
 /** e.g. "7 May 2026" for list rows */
 export function formatListDayMonthYear(iso?: string): string {
-  if (!iso) return "—";
+  if (!iso) return "-";
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return "-";
   return d.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 }
 
@@ -70,4 +71,58 @@ export function grossAndCommission(row: VendorSettlementRow): { gross: string; c
   const commission =
     md.commissionTotal != null ? String(md.commissionTotal) : md.commission != null ? String(md.commission) : "0";
   return { gross, commission };
+}
+function bookingDisplayName(row: VendorBookingRow): string {
+  const md = metaRecord(row.metadata);
+  return (
+    (typeof md.serviceName === "string" && md.serviceName.trim()) ||
+    (typeof md.catalogName === "string" && md.catalogName.trim()) ||
+    "Service booking"
+  );
+}
+
+function settlementBookingId(row: VendorSettlementRow): string {
+  const md = metaRecord(row.metadata);
+  return (
+    (typeof md.bookingId === "string" && md.bookingId.trim()) ||
+    (typeof md.booking_id === "string" && md.booking_id.trim()) ||
+    (typeof md.serviceBookingId === "string" && md.serviceBookingId.trim()) ||
+    ""
+  );
+}
+
+export function completedBookingsAsPendingSettlements(
+  bookings: VendorBookingRow[],
+  existingRows: VendorSettlementRow[] = [],
+): VendorSettlementRow[] {
+  const settledBookingIds = new Set(existingRows.map(settlementBookingId).filter(Boolean));
+
+  return bookings
+    .filter((booking) => String(booking.status || "").toLowerCase() === "completed")
+    .filter((booking) => !settledBookingIds.has(booking.id))
+    .map((booking) => {
+      const serviceName = bookingDisplayName(booking);
+      const createdAt = booking.updatedAt || booking.createdAt || booking.bookingDate;
+      return {
+        id: `service-booking-${booking.id}`,
+        vendorId: booking.vendorId,
+        orderId: booking.id,
+        settlementType: "service_booking",
+        status: "pending",
+        amount: String(booking.totalAmount ?? "0"),
+        metadata: {
+          source: "service_booking",
+          bookingId: booking.id,
+          displayRef: `BKG-${booking.id.slice(0, 8).toUpperCase()}`,
+          orderRef: `${serviceName} booking`,
+          serviceName,
+          bookingDate: booking.bookingDate,
+          timeSlot: booking.timeSlot,
+          gross: String(booking.totalAmount ?? "0"),
+          commission: "0",
+        },
+        createdAt,
+        updatedAt: booking.updatedAt || createdAt,
+      };
+    });
 }
