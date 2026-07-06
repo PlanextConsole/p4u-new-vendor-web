@@ -3,8 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, CalendarDays, DollarSign, Search } from "lucide-react";
 import type { VendorSettlementRow } from "@/lib/api/vendorSettlements";
-import { vendorSettlementsApi } from "@/lib/api/vendorSettlements";
-import { vendorBookingsApi } from "@/lib/api/vendorBookings";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -15,8 +13,9 @@ import {
   VendorListToolbar,
   VendorStatusBadge,
 } from "@/components/vendor/VendorListUi";
+import { fetchVendorSettlementRows } from "@/lib/vendor/loadVendorSettlementRows";
+import { useIsServiceVendor } from "@/lib/vendor/useIsServiceVendor";
 import {
-  completedBookingsAsPendingSettlements,
   displaySettlementRef,
   formatInr,
   formatListDayMonthYear,
@@ -63,6 +62,7 @@ function rowInDateRange(row: VendorSettlementRow, from: string, to: string): boo
 }
 
 export default function VendorPaymentHistoryView() {
+  const isService = useIsServiceVendor();
   const [items, setItems] = useState<VendorSettlementRow[]>([]);
   const [statsItems, setStatsItems] = useState<VendorSettlementRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -90,34 +90,26 @@ export default function VendorPaymentHistoryView() {
 
   const loadStats = useCallback(async () => {
     try {
-      const [settlementsRes, completedBookingsRes] = await Promise.all([
-        vendorSettlementsApi.list({ ...filterParams, limit: 500, offset: 0 }),
-        vendorBookingsApi.list({ status: "completed", limit: 500, offset: 0 }),
-      ]);
-      const settlements = settlementsRes.items || [];
-      const bookingSettlements = completedBookingsAsPendingSettlements(completedBookingsRes.items || [], settlements).filter(
+      const { settlements, bookingSettlements } = await fetchVendorSettlementRows(isService, filterParams);
+      const filteredBookings = bookingSettlements.filter(
         (row) => rowMatchesSearch(row, filterParams.q || "") && rowInDateRange(row, filterParams.from || "", filterParams.to || ""),
       );
-      setStatsItems([...settlements, ...bookingSettlements]);
+      setStatsItems([...settlements, ...filteredBookings]);
     } catch {
       setStatsItems([]);
     }
-  }, [filterParams]);
+  }, [filterParams, isService]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setErr("");
     try {
       const offset = (page - 1) * PER_PAGE;
-      const [settlementsRes, completedBookingsRes] = await Promise.all([
-        vendorSettlementsApi.list({ ...filterParams, limit: 500, offset: 0 }),
-        vendorBookingsApi.list({ status: "completed", limit: 500, offset: 0 }),
-      ]);
-      const settlements = settlementsRes.items || [];
-      const bookingSettlements = completedBookingsAsPendingSettlements(completedBookingsRes.items || [], settlements).filter(
+      const { settlements, bookingSettlements } = await fetchVendorSettlementRows(isService, filterParams);
+      const filteredBookings = bookingSettlements.filter(
         (row) => rowMatchesSearch(row, filterParams.q || "") && rowInDateRange(row, filterParams.from || "", filterParams.to || ""),
       );
-      const merged = [...settlements, ...bookingSettlements].sort(
+      const merged = [...settlements, ...filteredBookings].sort(
         (a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime(),
       );
       setItems(merged.slice(offset, offset + PER_PAGE));
@@ -129,7 +121,7 @@ export default function VendorPaymentHistoryView() {
     } finally {
       setLoading(false);
     }
-  }, [filterParams, page]);
+  }, [filterParams, page, isService]);
 
   useEffect(() => {
     setPage(1);

@@ -3,8 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle2, Clock3, DollarSign, XCircle } from "lucide-react";
 import type { VendorSettlementRow } from "@/lib/api/vendorSettlements";
-import { vendorSettlementsApi } from "@/lib/api/vendorSettlements";
-import { vendorBookingsApi } from "@/lib/api/vendorBookings";
 import { Card } from "@/components/ui/card";
 import {
   VendorListEmpty,
@@ -14,8 +12,9 @@ import {
   VendorListToolbar,
   VendorStatusBadge,
 } from "@/components/vendor/VendorListUi";
+import { fetchVendorSettlementRows, mergeSettlementRows } from "@/lib/vendor/loadVendorSettlementRows";
+import { useIsServiceVendor } from "@/lib/vendor/useIsServiceVendor";
 import {
-  completedBookingsAsPendingSettlements,
   displaySettlementRef,
   formatInr,
   formatShortDate,
@@ -28,6 +27,7 @@ import {
 const PER_PAGE = 10;
 
 export default function VendorSettlementsView() {
+  const isService = useIsServiceVendor();
   const [items, setItems] = useState<VendorSettlementRow[]>([]);
   const [statsRows, setStatsRows] = useState<VendorSettlementRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -38,31 +38,20 @@ export default function VendorSettlementsView() {
 
   const loadStats = useCallback(async () => {
     try {
-      const [settlementsRes, completedBookingsRes] = await Promise.all([
-        vendorSettlementsApi.list({ limit: 500, offset: 0 }),
-        vendorBookingsApi.list({ status: "completed", limit: 500, offset: 0 }),
-      ]);
-      const settlements = settlementsRes.items || [];
-      const bookingSettlements = completedBookingsAsPendingSettlements(completedBookingsRes.items || [], settlements);
+      const { settlements, bookingSettlements } = await fetchVendorSettlementRows(isService);
       setStatsRows([...settlements, ...bookingSettlements]);
     } catch {
       setStatsRows([]);
     }
-  }, []);
+  }, [isService]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setErr("");
     try {
       const offset = (page - 1) * PER_PAGE;
-      const [settlementsRes, completedBookingsRes] = await Promise.all([
-        vendorSettlementsApi.list({ limit: 500, offset: 0 }),
-        vendorBookingsApi.list({ status: "completed", limit: 500, offset: 0 }),
-      ]);
-      const settlements = settlementsRes.items || [];
-      const bookingSettlements = completedBookingsAsPendingSettlements(completedBookingsRes.items || [], settlements);
-      const merged = [...settlements, ...bookingSettlements]
-        .filter((row) => !statusFilter || row.status.toLowerCase() === statusFilter.toLowerCase())
+      const { settlements, bookingSettlements } = await fetchVendorSettlementRows(isService);
+      const merged = mergeSettlementRows(settlements, bookingSettlements, { statusFilter })
         .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
       setItems(merged.slice(offset, offset + PER_PAGE));
       setTotal(merged.length);
@@ -73,7 +62,7 @@ export default function VendorSettlementsView() {
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter]);
+  }, [page, statusFilter, isService]);
 
   useEffect(() => {
     void loadStats();
