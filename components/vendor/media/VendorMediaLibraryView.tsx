@@ -176,6 +176,23 @@ export default function VendorMediaLibraryView() {
     }
   }
 
+  async function removeFolder(folder: VendorMediaFolder) {
+    const count = folderFileCount(folder.id);
+    const warn = count
+      ? `Delete folder "${folder.name}" and its ${count} file(s)? This cannot be undone.`
+      : `Delete folder "${folder.name}"?`;
+    if (typeof window !== "undefined" && !window.confirm(warn)) return;
+    setErr("");
+    try {
+      await vendorMediaApi.deleteFolder(folder.id);
+      setFolders((prev) => prev.filter((x) => x.id !== folder.id));
+      setAssets((prev) => prev.filter((a) => a.folderId !== folder.id));
+      if (activeFolderId === folder.id) setActiveFolderId(null);
+    } catch (e: unknown) {
+      setErr(e && typeof e === "object" && "message" in e ? String((e as { message: string }).message) : "Delete folder failed");
+    }
+  }
+
   function onDrop(e: React.DragEvent) {
     e.preventDefault();
     setDragOver(false);
@@ -302,11 +319,11 @@ export default function VendorMediaLibraryView() {
           {!loading && showFolderGrid ? (
             <ul className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {filteredFolders.map((f) => (
-                <li key={f.id}>
+                <li key={f.id} className="relative">
                   <button
                     type="button"
                     onClick={() => setActiveFolderId(f.id)}
-                    className="flex w-full items-center justify-between gap-2 rounded-xl border border-border bg-muted/50/80 px-4 py-3 text-left transition hover:border-primary/40 hover:bg-primary/5"
+                    className="flex w-full items-center justify-between gap-2 rounded-xl border border-border bg-muted/50/80 px-4 py-3 pr-16 text-left transition hover:border-primary/40 hover:bg-primary/5"
                   >
                     <div className="flex min-w-0 items-center gap-2">
                       <Folder className="h-5 w-5 shrink-0 text-primary" aria-hidden />
@@ -315,6 +332,15 @@ export default function VendorMediaLibraryView() {
                     <span className="shrink-0 rounded-full bg-card px-2 py-0.5 text-xs font-medium text-muted-foreground ring-1 ring-border">
                       {folderFileCount(f.id)}
                     </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); void removeFolder(f); }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"
+                    aria-label={`Delete folder ${f.name}`}
+                    title="Delete folder"
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden />
                   </button>
                 </li>
               ))}

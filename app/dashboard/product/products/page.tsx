@@ -175,8 +175,8 @@ export default function VendorProductsListPage() {
             const sku = String(meta.sku || "—");
             const qty = meta.quantity != null ? String(meta.quantity) : "—";
             const thumb = mediaUrl(p.thumbnailUrl || "");
-            const pendingMod = String(p.moderationStatus || "approved").toLowerCase() === "pending";
-            const statusLabel = pendingMod ? "inactive" : "active";
+            const modStatus = String(p.moderationStatus || "approved").toLowerCase();
+            const statusLabel = modStatus === "rejected" ? "rejected" : modStatus === "pending" ? "inactive" : "active";
             return (
               <li key={p.id}>
                 <Card className="relative flex items-center gap-4 p-4">

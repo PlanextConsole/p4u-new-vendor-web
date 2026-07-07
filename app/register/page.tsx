@@ -19,7 +19,7 @@ import {
 
 const STEPS = ["Details", "KYC & Documents", "Bank", "Review"] as const;
 
-type VendorKindChoice = "SERVICE" | "PRODUCT";
+type VendorKindChoice = "SERVICE" | "PRODUCT" | "BOTH";
 
 function validatePhone(raw: string): string {
   const d = raw.replace(/\D/g, "");
@@ -109,21 +109,24 @@ export default function RegisterPage() {
   }
 
   function buildPayload() {
+    const wantsProduct = vendorKind === "PRODUCT" || vendorKind === "BOTH";
+    const wantsService = vendorKind === "SERVICE" || vendorKind === "BOTH";
     return {
-      vendorKind: (vendorKind === "SERVICE" ? "service" : "product") as
+      vendorKind: (vendorKind === "SERVICE" ? "service" : vendorKind === "BOTH" ? "both" : "product") as
         | "service"
-        | "product",
+        | "product"
+        | "both",
       vendorType: vendorKind,
       ownerName: details.ownerName.trim(),
       businessName: details.businessName.trim(),
       email: details.email.trim() || null,
       phone: details.phone.trim(),
       categoriesJson:
-        vendorKind === "PRODUCT" && details.categorySlug.trim()
+        wantsProduct && details.categorySlug.trim()
           ? [details.categorySlug.trim()]
           : null,
       servicesJson:
-        vendorKind === "SERVICE" && details.serviceName.trim()
+        wantsService && details.serviceName.trim()
           ? [details.serviceName.trim()]
           : null,
       gst: details.gst.trim() || null,
@@ -189,7 +192,7 @@ export default function RegisterPage() {
           <div>
             <h1 className="text-lg font-bold text-foreground">Vendor Registration</h1>
             <p className="text-sm text-muted-foreground">
-              {vendorKind === "SERVICE" ? "Service vendor" : "Product vendor"}
+              {vendorKind === "SERVICE" ? "Service vendor" : vendorKind === "BOTH" ? "Product & Service vendor" : "Product vendor"}
             </p>
           </div>
         </header>
@@ -263,9 +266,10 @@ export default function RegisterPage() {
                   >
                     <option value="PRODUCT">Product Vendor</option>
                     <option value="SERVICE">Service Vendor</option>
+                    <option value="BOTH">Both</option>
                   </select>
                 </FormField>
-                {vendorKind === "PRODUCT" ? (
+                {(vendorKind === "PRODUCT" || vendorKind === "BOTH") ? (
                   <FormField label="Vendor Category">
                     <input
                       className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
@@ -276,7 +280,8 @@ export default function RegisterPage() {
                       }
                     />
                   </FormField>
-                ) : (
+                ) : null}
+                {(vendorKind === "SERVICE" || vendorKind === "BOTH") ? (
                   <FormField label="Services">
                     <input
                       className="input flex h-11 w-full rounded-xl border border-input bg-background px-4 py-2 text-sm"
@@ -287,7 +292,7 @@ export default function RegisterPage() {
                       }
                     />
                   </FormField>
-                )}
+                ) : null}
               </div>
 
               <div className="rounded-xl bg-vendor-teal-muted/40 p-4">
@@ -447,10 +452,17 @@ export default function RegisterPage() {
               <ReviewRow label="Business name" value={details.businessName} />
               <ReviewRow label="Email" value={details.email} />
               <ReviewRow label="Mobile" value={details.phone ? maskPhone(details.phone) : ""} />
-              <ReviewRow
-                label={vendorKind === "SERVICE" ? "Services" : "Vendor category"}
-                value={vendorKind === "SERVICE" ? details.serviceName : details.categorySlug}
-              />
+              {vendorKind === "BOTH" ? (
+                <>
+                  <ReviewRow label="Vendor category" value={details.categorySlug} />
+                  <ReviewRow label="Services" value={details.serviceName} />
+                </>
+              ) : (
+                <ReviewRow
+                  label={vendorKind === "SERVICE" ? "Services" : "Vendor category"}
+                  value={vendorKind === "SERVICE" ? details.serviceName : details.categorySlug}
+                />
+              )}
               <ReviewRow label="GSTIN" value={details.gst} />
               <ReviewRow label="PAN" value={details.pan} />
               <ReviewRow

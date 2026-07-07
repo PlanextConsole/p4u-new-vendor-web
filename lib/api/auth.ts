@@ -39,8 +39,8 @@ export type PhoneExchangeResponse =
  */
 export interface RegisterVendorByPhonePayload {
   firebaseIdToken: string;
-  vendorKind: "service" | "product";
-  vendorType: "SERVICE" | "PRODUCT";
+  vendorKind: "service" | "product" | "both";
+  vendorType: "SERVICE" | "PRODUCT" | "BOTH";
   ownerName: string;
   businessName: string;
   email?: string | null;

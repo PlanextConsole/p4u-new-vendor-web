@@ -112,6 +112,7 @@ const PRODUCT_STATUS_CLASS: Record<string, string> = {
   inactive: "bg-destructive/10 text-destructive",
   draft: "bg-muted text-muted-foreground",
   pending_approval: "bg-warning/10 text-warning",
+  rejected: "bg-destructive/10 text-destructive",
 };
 
 export function VendorStatusBadge({

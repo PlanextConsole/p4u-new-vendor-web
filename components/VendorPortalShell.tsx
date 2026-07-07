@@ -92,6 +92,7 @@ export default function VendorPortalShell({ children }: { children: React.ReactN
   }, [pathname]);
 
   const vendorType = String(me?.vendorType || "").toUpperCase();
+  const isBoth = vendorType === "BOTH";
   const isService = vendorType === "SERVICE";
   const displayName = me?.ownerName || me?.businessName || getStoredUsername() || "Vendor";
   const vendorInitial = displayName.trim().charAt(0).toUpperCase() || "V";
@@ -122,7 +123,25 @@ export default function VendorPortalShell({ children }: { children: React.ReactN
     { href: "/dashboard/product/kyc", label: "KYC Verification", icon: ShieldCheck },
   ];
 
-  const links = isService ? serviceLinks : productLinks;
+  // "Both" vendors get product + service sections merged into one nav, with the
+  // shared items (settlements, bank, profile, media, kyc) kept once on the product root.
+  const bothLinks: NavLink[] = [
+    { href: "/dashboard/product", label: "Dashboard", icon: LayoutDashboard },
+    { href: "/dashboard/product/products", label: "Products", icon: Package },
+    { href: "/dashboard/product/orders", label: "Orders", icon: ShoppingCart },
+    { href: "/dashboard/product/dropshipping", label: "Dropshipping", icon: Truck },
+    { href: "/dashboard/service/services", label: "Services", icon: Wrench },
+    { href: "/dashboard/service/availability", label: "Availability", icon: CalendarClock },
+    { href: "/dashboard/service/bookings", label: "Bookings", icon: CalendarCheck },
+    { href: "/dashboard/product/settlements", label: "Settlements", icon: DollarSign },
+    { href: "/dashboard/product/payments", label: "Payment History", icon: History },
+    { href: "/dashboard/product/bank", label: "Bank Account", icon: CreditCard },
+    { href: "/dashboard/product/profile", label: "Profile & Settings", icon: User },
+    { href: "/dashboard/product/media", label: "Media Library", icon: ImageIcon },
+    { href: "/dashboard/product/kyc", label: "KYC Verification", icon: ShieldCheck },
+  ];
+
+  const links = isBoth ? bothLinks : isService ? serviceLinks : productLinks;
   const dashRoot = isService ? "/dashboard/service" : "/dashboard/product";
   const settlementsHref = `${dashRoot}/settlements`;
   const profileHref = `${dashRoot}/profile`;
@@ -132,6 +151,15 @@ export default function VendorPortalShell({ children }: { children: React.ReactN
   const ordersHref = isService ? "/dashboard/service/bookings" : "/dashboard/product/orders";
 
   const mobileBottomNav = useMemo((): NavLink[] => {
+    if (isBoth) {
+      return [
+        { href: dashRoot, label: "Home", icon: LayoutDashboard },
+        { href: "/dashboard/product/products", label: "Products", icon: Package },
+        { href: "/dashboard/service/services", label: "Services", icon: Wrench },
+        { href: settlementsHref, label: "Payments", icon: DollarSign },
+        { href: profileHref, label: "Profile", icon: User },
+      ];
+    }
     if (isService) {
       return [
         { href: dashRoot, label: "Home", icon: LayoutDashboard },
@@ -148,7 +176,7 @@ export default function VendorPortalShell({ children }: { children: React.ReactN
       { href: settlementsHref, label: "Payments", icon: DollarSign },
       { href: profileHref, label: "Profile", icon: User },
     ];
-  }, [isService, dashRoot, settlementsHref, profileHref]);
+  }, [isBoth, isService, dashRoot, settlementsHref, profileHref]);
 
   const drawerQuickActions = useMemo(
     () => [

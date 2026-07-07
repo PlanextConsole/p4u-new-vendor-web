@@ -30,6 +30,10 @@ export const vendorMediaApi = {
     return apiClient.post<VendorMediaFolder>(`${BASE}/me/media/folders`, { name });
   },
 
+  deleteFolder(folderId: string) {
+    return apiClient.delete<{ ok: boolean }>(`${BASE}/me/media/folders/${encodeURIComponent(folderId)}`);
+  },
+
   listFolderAssets(folderId: string) {
     return apiClient.get<{ folder: VendorMediaFolder; items: VendorMediaAsset[] }>(
       `${BASE}/me/media/folders/${encodeURIComponent(folderId)}/assets`,
