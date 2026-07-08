@@ -32,6 +32,8 @@ interface RequestInternalOptions {
   retry401?: boolean;
   /** When true, 401 does not clear session / redirect to login (profile probe). */
   softAuthFailure?: boolean;
+  /** Abort hung gateway/upstream calls instead of blocking the UI (ms). */
+  timeoutMs?: number;
 }
 
 function authHeaders(): Record<string, string> {
@@ -221,8 +223,13 @@ async function request<T>(
   options: RequestInit = {},
   internal: RequestInternalOptions = {},
 ): Promise<T> {
-  const { skipAuthHeader = false, skipAuthRefresh = false, retry401 = false, softAuthFailure = false } =
-    internal;
+  const {
+    skipAuthHeader = false,
+    skipAuthRefresh = false,
+    retry401 = false,
+    softAuthFailure = false,
+    timeoutMs = 0,
+  } = internal;
   const url = `${BASE_URL}${path}`;
 
   if (!skipAuthRefresh) {
@@ -249,19 +256,30 @@ async function request<T>(
   };
 
   let res: Response;
+  const controller = timeoutMs > 0 && typeof window !== "undefined" ? new AbortController() : null;
+  const timer =
+    controller != null ? window.setTimeout(() => controller.abort(), timeoutMs) : null;
   try {
-    res = await fetch(url, { ...options, headers });
+    res = await fetch(url, {
+      ...options,
+      headers,
+      signal: controller?.signal,
+    });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : String(e);
+    const timedOut = controller != null && e instanceof DOMException && e.name === "AbortError";
     const err: ApiErrorShape = {
-      status: 0,
-      message:
-        msg === "Failed to fetch"
+      status: timedOut ? 504 : 0,
+      message: timedOut
+        ? "Request timed out. The API may be restarting — please retry."
+        : msg === "Failed to fetch"
           ? "Cannot reach the API. Start the gateway on :8080, or leave NEXT_PUBLIC_API_GATEWAY_URL empty so /api is proxied by Next.js."
           : msg || "Network request failed",
       details: e,
     };
     throw err;
+  } finally {
+    if (timer != null) window.clearTimeout(timer);
   }
 
   if (!res.ok) {

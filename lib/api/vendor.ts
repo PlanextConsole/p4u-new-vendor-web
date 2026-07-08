@@ -88,6 +88,7 @@ export async function getVendorMe(): Promise<VendorProfile> {
   try {
     const real = await apiClient.getInternal<VendorProfile>(`${BASE}/me`, {
       softAuthFailure: true,
+      timeoutMs: 12_000,
     });
     const vt = String(real.vendorType || "").toUpperCase();
     if (typeof window !== "undefined" && vt) {
@@ -96,6 +97,9 @@ export async function getVendorMe(): Promise<VendorProfile> {
     return { ...real, source: "catalog" };
   } catch (err) {
     if (isHttpStatus(err, 401)) throw err;
+    // Only fall back to onboarding when there is no catalog vendor row (404).
+    // On 502/503/504 the vendor service is down — fail fast instead of a second slow call.
+    if (!isHttpStatus(err, 404)) throw err;
     try {
       const rec = await getMyVendorOnboarding();
       const profile = onboardingToProfile(rec);

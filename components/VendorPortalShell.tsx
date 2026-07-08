@@ -45,6 +45,7 @@ export default function VendorPortalShell({ children }: { children: React.ReactN
   const router = useRouter();
   const [me, setMe] = useState<VendorProfile | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -53,6 +54,7 @@ export default function VendorPortalShell({ children }: { children: React.ReactN
       return;
     }
     let cancelled = false;
+    setError(null);
     (async () => {
       try {
         const profile = await getVendorMe();
@@ -62,17 +64,30 @@ export default function VendorPortalShell({ children }: { children: React.ReactN
         if (cancelled) return;
         const status =
           e && typeof e === "object" && "status" in e ? Number((e as { status?: number }).status) : NaN;
+        const message =
+          e && typeof e === "object" && "message" in e && typeof (e as { message?: string }).message === "string"
+            ? (e as { message: string }).message
+            : "Could not load your vendor profile.";
         if (status === 401) {
           router.replace("/");
           return;
         }
-        router.replace("/onboarding");
+        if (status === 404) {
+          router.replace("/onboarding");
+          return;
+        }
+        setMe(null);
+        setError(
+          status === 502 || status === 503 || status === 504
+            ? "Vendor API is temporarily unavailable (server restarting). Please retry in a moment."
+            : message,
+        );
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [router, reloadKey]);
 
   useEffect(() => {
     if (!me) return;
@@ -209,9 +224,18 @@ export default function VendorPortalShell({ children }: { children: React.ReactN
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-8">
         <p className="max-w-md text-center text-destructive">{error}</p>
-        <Link href="/" className="text-primary underline">
-          Back to login
-        </Link>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <button
+            type="button"
+            className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+            onClick={() => setReloadKey((k) => k + 1)}
+          >
+            Retry
+          </button>
+          <Link href="/" className="text-primary underline">
+            Back to login
+          </Link>
+        </div>
       </div>
     );
   }
