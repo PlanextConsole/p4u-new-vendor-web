@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect } from "react";
 import { ensureTokenFresh } from "@/lib/api/client";
@@ -18,7 +18,7 @@ function decodeJwtExpMs(token: string): number | null {
 
 function hasStoredSession(): boolean {
   return Boolean(
-    localStorage.getItem(VENDOR_AUTH.access) && localStorage.getItem(VENDOR_AUTH.refresh),
+    localStorage.getItem(VENDOR_AUTH.access) || localStorage.getItem(VENDOR_AUTH.refresh),
   );
 }
 
@@ -77,3 +77,4 @@ export default function VendorSessionProvider({ children }: { children: React.Re
 
   return <>{children}</>;
 }
+

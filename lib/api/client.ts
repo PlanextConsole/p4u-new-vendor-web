@@ -1,10 +1,10 @@
-/**
+﻿/**
  * HTTP client for the P4U API Gateway (same as customer web; separate token keys).
  *
  * If `NEXT_PUBLIC_API_GATEWAY_URL` is unset, requests use same-origin `/api/...` and
  * `next.config.js` rewrites proxy to the gateway (avoids CORS / mixed-origin issues).
  */
-import { VENDOR_AUTH, VENDOR_TOKEN_EVENT, clearVendorAuthStorage } from "@/lib/storageKeys";
+import { VENDOR_AUTH, VENDOR_TOKEN_EVENT } from "@/lib/storageKeys";
 
 /** Empty string = same-origin `/api` (see rewrites in next.config.js). */
 const BASE_URL = (process.env.NEXT_PUBLIC_API_GATEWAY_URL ?? "").replace(/\/$/, "");
@@ -70,7 +70,9 @@ export function resetRefreshSessionState() {
 function forceLoginRedirect() {
   refreshSessionDead = true;
   refreshBlockedUntil = Date.now() + 300_000;
-  clearVendorAuthStorage();
+  // Do not clear localStorage here. Persistent tokens must survive refreshes,
+  // tab closes, app restarts, and transient refresh failures. Explicit logout is
+  // the only place that removes vendor auth storage.
   if (typeof window !== "undefined") {
     const path = window.location.pathname;
     const onAuthScreen = path === "/login" || path === "/" || path === "/register";
@@ -189,7 +191,7 @@ async function refreshAccessTokenDeduped(): Promise<void> {
 /**
  * Refresh only once the access token is close to expiring. Keycloak access
  * tokens in this deployment live ~5 min, so a wide window (e.g. 5 min) would
- * refresh a brand-new token on the very first request after login — and if that
+ * refresh a brand-new token on the very first request after login â€” and if that
  * refresh of a just-minted token fails, the fresh session is killed and the user
  * is bounced to login. Keep the window small so healthy tokens are left alone.
  */
@@ -197,10 +199,10 @@ const REFRESH_BEFORE_EXPIRY_MS = 60_000;
 
 export async function ensureTokenFresh(): Promise<void> {
   const { access, refresh } = tokenSnapshot();
-  if (!access || !refresh) return;
+  if (!refresh) return;
   if (refreshSessionDead || Date.now() < refreshBlockedUntil) return;
-  const expMs = decodeJwtExpMs(access);
-  if (expMs != null && expMs - Date.now() > REFRESH_BEFORE_EXPIRY_MS) return;
+  const expMs = access ? decodeJwtExpMs(access) : null;
+  if (access && expMs != null && expMs - Date.now() > REFRESH_BEFORE_EXPIRY_MS) return;
   await refreshAccessTokenDeduped();
 }
 
@@ -271,7 +273,7 @@ async function request<T>(
     const err: ApiErrorShape = {
       status: timedOut ? 504 : 0,
       message: timedOut
-        ? "Request timed out. The API may be restarting — please retry."
+        ? "Request timed out. The API may be restarting â€” please retry."
         : msg === "Failed to fetch"
           ? "Cannot reach the API. Start the gateway on :8080, or leave NEXT_PUBLIC_API_GATEWAY_URL empty so /api is proxied by Next.js."
           : msg || "Network request failed",
@@ -402,3 +404,6 @@ export const apiClient = {
     return request<T>(path, { method: "GET" }, internal);
   },
 };
+
+
+
