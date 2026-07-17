@@ -57,8 +57,7 @@ function formatPhoneExchangeError(err: unknown): string {
     e.status === 503 ||
     m.includes("otp login failed") ||
     m.includes("identity server rejected") ||
-    m.includes("direct access grants") ||
-    m.includes("password-grant")
+    m.includes("direct access grants")
   ) {
     return msg.length > 0 && msg.length < 400
       ? msg

@@ -9,7 +9,6 @@ import {
   Crown,
   CreditCard,
   ImagePlus,
-  KeyRound,
   Mail,
   MapPin,
   Navigation,
@@ -466,15 +465,6 @@ export default function VendorBusinessProfileView() {
                 KYC Verification
               </span>
               <span className="text-xs text-muted-foreground">{verified ? "Verified" : "Review"}</span>
-            </Link>
-          </li>
-          <li>
-            <Link
-              href={`${dashRoot}/change-password`}
-              className="flex items-center gap-2 rounded-xl border border-border px-4 py-3 text-sm font-medium hover:bg-muted"
-            >
-              <KeyRound className="h-4 w-4 text-primary" />
-              Change Password
             </Link>
           </li>
           <li>

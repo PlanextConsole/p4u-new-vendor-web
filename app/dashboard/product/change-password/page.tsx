@@ -1,1 +1,5 @@
-export { default } from "@/components/vendor/account/VendorChangePasswordView";
+import { redirect } from "next/navigation";
+
+export default function LegacyAccountRoute() {
+  redirect("/dashboard/product/profile");
+}

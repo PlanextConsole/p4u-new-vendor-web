@@ -218,8 +218,8 @@ export default function RegisterPage() {
             <section className="space-y-5">
               <h2 className="text-lg font-semibold text-foreground">Details</h2>
               <p className="text-sm text-muted-foreground">
-                Sign-in is via mobile OTP — no username or password to remember. After your
-                application is approved you will sign in with this mobile number.
+                Sign-in uses mobile OTP. After your application is approved, you will sign in
+                with this mobile number.
               </p>
               <div className="grid gap-4 sm:grid-cols-2">
                 <FormField label="Owner Name *">

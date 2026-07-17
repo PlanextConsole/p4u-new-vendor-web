@@ -161,7 +161,6 @@ export default function VendorPortalShell({ children }: { children: React.ReactN
   const settlementsHref = `${dashRoot}/settlements`;
   const profileHref = `${dashRoot}/profile`;
   const accountControlHref = `${dashRoot}/account-control`;
-  const changePasswordHref = `${dashRoot}/change-password`;
   const helpHref = `${dashRoot}/help`;
   const ordersHref = isService ? "/dashboard/service/bookings" : "/dashboard/product/orders";
 
@@ -209,10 +208,9 @@ export default function VendorPortalShell({ children }: { children: React.ReactN
   const drawerMoreItems = useMemo(
     () => [
       { label: "Account & Control", icon: Shield, href: accountControlHref },
-      { label: "Change Password", icon: ShieldCheck, href: changePasswordHref },
       { label: "Settings", icon: Settings, href: profileHref },
     ],
-    [profileHref, accountControlHref, changePasswordHref],
+    [profileHref, accountControlHref],
   );
 
   async function logout() {
@@ -608,7 +606,6 @@ function deriveHeaderTitle(pathname: string): string {
     media: "Media Library",
     kyc: "KYC Verification",
     help: "Help & Support",
-    "change-password": "Change Password",
     "account-control": "Account Ownership & Control",
     products: "My Products",
     dropshipping: "Dropshipping",
