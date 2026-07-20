@@ -225,7 +225,7 @@ export default function VendorBusinessProfileView() {
     }
   }
 
-  function useCurrentLocation() {
+  function fillCurrentLocation() {
     if (!navigator.geolocation) {
       setBanner("Location is not available in this browser.");
       return;
@@ -568,7 +568,7 @@ export default function VendorBusinessProfileView() {
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={() => useCurrentLocation()}
+                    onClick={fillCurrentLocation}
                     disabled={locating}
                     className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm font-semibold text-foreground hover:bg-muted disabled:opacity-60"
                   >
