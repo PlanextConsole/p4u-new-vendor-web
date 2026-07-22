@@ -37,6 +37,17 @@ const STATUS_OPTIONS = [
   "cancelled",
 ] as const;
 
+const CANCELLABLE_STATUSES = new Set([
+  "created",
+  "placed",
+  "pending",
+  "paid",
+  "accepted",
+  "processing",
+  "in_progress",
+  "new",
+]);
+
 export function metaRecord(m: unknown): Record<string, unknown> {
   if (!m || typeof m !== "object" || Array.isArray(m)) return {};
   return m as Record<string, unknown>;
@@ -426,7 +437,11 @@ export function OrderDetailModal({
                 value={statusDraft}
                 onChange={(e) => setStatusDraft(e.target.value)}
               >
-                {STATUS_OPTIONS.map((s) => (
+                {STATUS_OPTIONS.filter((s) => {
+                  if (s !== "cancelled") return true;
+                  const current = String(local.status || "").toLowerCase();
+                  return CANCELLABLE_STATUSES.has(current) || current === "cancelled";
+                }).map((s) => (
                   <option key={s} value={s}>
                     {s.replace(/_/g, " ")}
                   </option>
