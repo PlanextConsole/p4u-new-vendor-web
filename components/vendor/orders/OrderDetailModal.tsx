@@ -184,11 +184,20 @@ export function OrderDetailModal({
   const [statusDraft, setStatusDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
+  const [shippingType, setShippingType] = useState("own");
+  const [courierName, setCourierName] = useState("");
+  const [trackingNumber, setTrackingNumber] = useState("");
+  const [trackingUrl, setTrackingUrl] = useState("");
 
   useEffect(() => {
     setLocal(order);
     setStatusDraft(order?.status ?? "");
     setErr("");
+    const m = metaRecord(order?.metadata);
+    setShippingType(String(m.shipping_type || m.shippingType || "own"));
+    setCourierName(String(m.courier_name || m.courierName || ""));
+    setTrackingNumber(String(m.tracking_number || m.trackingNumber || ""));
+    setTrackingUrl(String(m.tracking_url || m.trackingUrl || ""));
   }, [order]);
 
   const meta = useMemo(() => metaRecord(local?.metadata), [local]);
@@ -216,7 +225,9 @@ export function OrderDetailModal({
     setSaving(true);
     setErr("");
     try {
-      const updated = await vendorOrdersApi.patch(local.id, { status: statusDraft });
+      if (statusDraft === "shipped" && shippingType === "courier" && (!courierName.trim() || !trackingNumber.trim())) { throw new Error("Courier name and tracking number are required."); }
+      const metadata = statusDraft === "shipped" ? { ...meta, shipping_type: shippingType, courier_name: courierName.trim(), tracking_number: trackingNumber.trim(), tracking_url: trackingUrl.trim() } : meta;
+      const updated = await vendorOrdersApi.patch(local.id, { status: statusDraft, metadata });
       setLocal(updated);
       onUpdated(updated);
       onClose();
@@ -229,6 +240,16 @@ export function OrderDetailModal({
     }
   }
 
+  async function updateReturn(action: "approve" | "reject" | "received") {
+    if (!local) return;
+    const note = window.prompt(`Optional note for ${action}:`) || undefined;
+    setSaving(true); setErr("");
+    try {
+      const updated = await vendorOrdersApi.updateReturn(local.id, action, note);
+      setLocal(updated); onUpdated(updated);
+    } catch (e: any) { setErr(e?.message || "Return update failed"); }
+    finally { setSaving(false); }
+  }
   if (!local) return null;
 
   const refLabel = displayOrderRef(local);
@@ -411,9 +432,20 @@ export function OrderDetailModal({
                   </option>
                 ))}
               </select>
+              {statusDraft === "shipped" ? (
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <label className="text-sm"><span>Shipping type</span><select className="input mt-1 w-full" value={shippingType} onChange={(e) => setShippingType(e.target.value)}><option value="own">Own delivery</option><option value="courier">Courier</option></select></label>
+                  {shippingType === "courier" ? <><label className="text-sm"><span>Courier name</span><input className="input mt-1 w-full" value={courierName} onChange={(e) => setCourierName(e.target.value)} required /></label><label className="text-sm"><span>Tracking / AWB</span><input className="input mt-1 w-full" value={trackingNumber} onChange={(e) => setTrackingNumber(e.target.value)} required /></label><label className="text-sm"><span>Tracking URL</span><input className="input mt-1 w-full" value={trackingUrl} onChange={(e) => setTrackingUrl(e.target.value)} /></label></> : null}
+                </div>
+              ) : null}
             </div>
           ) : null}
 
+          {meta.returnRequest && typeof meta.returnRequest === "object" ? (() => {
+            const request = meta.returnRequest as Record<string, unknown>;
+            const status = String(request.status || "requested");
+            return <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4"><h3 className="font-semibold text-amber-950">Customer return request</h3><p className="mt-1 text-sm text-amber-900">{String(request.reason || "No reason provided")}</p><p className="mt-2 text-xs font-semibold uppercase text-amber-800">Status: {status.replace(/_/g, " ")}</p><div className="mt-3 flex flex-wrap gap-2">{status === "requested" ? <><button type="button" disabled={saving} onClick={() => void updateReturn("approve")} className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white">Approve</button><button type="button" disabled={saving} onClick={() => void updateReturn("reject")} className="rounded-lg bg-rose-600 px-3 py-2 text-sm font-semibold text-white">Reject</button></> : null}{status === "approved" ? <button type="button" disabled={saving} onClick={() => void updateReturn("received")} className="rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground">Mark return received</button> : null}</div></div>;
+          })() : null}
           {err ? <p className="mt-3 text-sm text-destructive">{err}</p> : null}
         </div>
 

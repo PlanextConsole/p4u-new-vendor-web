@@ -1,60 +1,19 @@
 "use client";
-
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ArrowLeft, HelpCircle, Mail, MessageCircle } from "lucide-react";
+import { ArrowLeft, HelpCircle, MessageCircle, Plus, Send } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { VendorFormLayout } from "@/components/vendor/VendorListUi";
-
-export default function VendorHelpView() {
-  const pathname = usePathname();
-  const dashRoot = pathname.includes("/dashboard/service") ? "/dashboard/service" : "/dashboard/product";
-
-  return (
-    <VendorFormLayout width="md">
-      <header className="flex items-center gap-3">
-        <Link href={dashRoot} className="rounded-lg p-1 hover:bg-muted">
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-        <h1 className="text-lg font-bold">Help &amp; Support</h1>
-      </header>
-
-      <Card className="p-6">
-        <div className="flex gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <HelpCircle className="h-5 w-5" />
-          </div>
-          <div>
-            <p className="font-semibold">Need assistance?</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Contact the P4U vendor support team for help with orders, settlements, KYC, or account issues.
-            </p>
-          </div>
-        </div>
-      </Card>
-
-      <ul className="space-y-3">
-        <li>
-          <Card className="flex items-center gap-3 p-4">
-            <Mail className="h-5 w-5 text-primary" />
-            <div>
-              <p className="text-sm font-semibold">Email support</p>
-              <a href="mailto:support@p4u.in" className="text-sm text-primary underline">
-                support@p4u.in
-              </a>
-            </div>
-          </Card>
-        </li>
-        <li>
-          <Card className="flex items-center gap-3 p-4">
-            <MessageCircle className="h-5 w-5 text-primary" />
-            <div>
-              <p className="text-sm font-semibold">Vendor handbook</p>
-              <p className="text-sm text-muted-foreground">Guides for listings, payouts, and compliance are coming soon.</p>
-            </div>
-          </Card>
-        </li>
-      </ul>
-    </VendorFormLayout>
-  );
+import { vendorSupportApi, type VendorSupportTicket } from "@/lib/api/vendorSupport";
+export default function VendorHelpView(){
+ const pathname=usePathname(),dashRoot=pathname.includes('/dashboard/service')?'/dashboard/service':'/dashboard/product';
+ const [tickets,setTickets]=useState<VendorSupportTicket[]>([]),[selected,setSelected]=useState<VendorSupportTicket|null>(null),[form,setForm]=useState({subject:'',message:'',category:'orders',priority:'medium'}),[reply,setReply]=useState(''),[error,setError]=useState('');
+ const load=useCallback(async()=>{try{const r=await vendorSupportApi.list();setTickets(r.items||[]);}catch(e){setError(e instanceof Error?e.message:'Unable to load tickets');}},[]);useEffect(()=>{void load();},[load]);
+ const create=async()=>{try{const row=await vendorSupportApi.create(form);setSelected(row);setForm({...form,subject:'',message:''});await load();}catch(e){setError(e instanceof Error?e.message:'Unable to create ticket');}};
+ const open=async(id:string)=>{try{setSelected(await vendorSupportApi.get(id));}catch(e){setError(e instanceof Error?e.message:'Unable to open ticket');}};
+ const send=async()=>{if(!selected||reply.trim().length<2)return;try{setSelected(await vendorSupportApi.message(selected.id,reply));setReply('');await load();}catch(e){setError(e instanceof Error?e.message:'Unable to send reply');}};
+ return <VendorFormLayout width="lg"><header className="flex items-center gap-3"><Link href={dashRoot} className="rounded-lg p-1 hover:bg-muted"><ArrowLeft className="h-5 w-5"/></Link><h1 className="text-lg font-bold">Help &amp; Support</h1></header>
+ <Card className="p-5"><div className="mb-4 flex gap-3"><HelpCircle className="h-5 w-5 text-primary"/><div><p className="font-semibold">Vendor support desk</p><p className="text-sm text-muted-foreground">Raise a tracked issue and chat with support.</p></div></div><div className="grid gap-3 md:grid-cols-2"><input value={form.subject} onChange={e=>setForm({...form,subject:e.target.value})} placeholder="Subject" className="h-11 rounded-lg border px-3"/><select value={form.category} onChange={e=>setForm({...form,category:e.target.value})} className="h-11 rounded-lg border px-3"><option value="orders">Orders</option><option value="settlements">Settlements</option><option value="kyc">KYC</option><option value="catalog">Catalogue</option><option value="account">Account</option></select><textarea value={form.message} onChange={e=>setForm({...form,message:e.target.value})} placeholder="Describe the issue" className="min-h-24 rounded-lg border p-3 md:col-span-2"/><select value={form.priority} onChange={e=>setForm({...form,priority:e.target.value})} className="h-11 rounded-lg border px-3"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="urgent">Urgent</option></select><button disabled={form.subject.trim().length<4||form.message.trim().length<2} onClick={create} className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 font-semibold text-primary-foreground disabled:opacity-50"><Plus className="h-4 w-4"/>Create ticket</button></div>{error&&<p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}</Card>
+ <div className="grid gap-4 md:grid-cols-[300px_1fr]"><div className="space-y-2">{tickets.length===0?<Card className="p-5 text-sm text-muted-foreground">No support tickets yet.</Card>:tickets.map(t=><button key={t.id} onClick={()=>open(t.id)} className="w-full rounded-xl border bg-card p-4 text-left"><div className="flex justify-between gap-2"><b>{t.subject}</b><span className="text-xs uppercase text-primary">{t.status.replace('_',' ')}</span></div><p className="mt-1 text-xs text-muted-foreground">{t.category} · {t.priority}</p></button>)}</div><Card className="min-h-80 p-5">{selected?<><div className="mb-4 flex justify-between"><div><h2 className="font-bold">{selected.subject}</h2><p className="text-xs text-muted-foreground">{selected.status.replace('_',' ')}</p></div>{!['closed','resolved'].includes(selected.status)&&<button className="text-sm text-destructive" onClick={async()=>{setSelected(await vendorSupportApi.close(selected.id));await load();}}>Close</button>}</div><div className="max-h-72 space-y-2 overflow-auto">{selected.messages?.map(m=><div key={m.id} className={`rounded-lg p-3 text-sm ${m.sender_type==='admin'?'bg-primary/10':'bg-muted'}`}><b>{m.sender_type==='admin'?'Support':'You'}</b><p>{m.message}</p></div>)}</div>{!['closed','resolved'].includes(selected.status)&&<div className="mt-4 flex gap-2"><input value={reply} onChange={e=>setReply(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void send();}} placeholder="Reply" className="h-11 flex-1 rounded-lg border px-3"/><button onClick={send} className="rounded-lg bg-primary px-4 text-primary-foreground"><Send className="h-4 w-4"/></button></div>}</>:<div className="flex min-h-64 flex-col items-center justify-center text-muted-foreground"><MessageCircle className="mb-2 h-9 w-9"/><p>Select a ticket to view its conversation.</p></div>}</Card></div></VendorFormLayout>;
 }

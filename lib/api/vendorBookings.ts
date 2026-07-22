@@ -46,6 +46,13 @@ export const vendorBookingsApi = {
     );
   },
 
+  submitCompletionProof(bookingId: string, photoUrls: string[], notes?: string) {
+    return apiClient.post<VendorBookingRow>(`${BASE}/bookings/${encodeURIComponent(bookingId)}/completion-proof`, { photoUrls, notes });
+  },
+
+  verifyCompletionOtp(bookingId: string, otp: string) {
+    return apiClient.post<VendorBookingRow>(`${BASE}/bookings/${encodeURIComponent(bookingId)}/completion-otp`, { otp });
+  },
   get(bookingId: string) {
     return apiClient.get<VendorBookingRow>(`${BASE}/bookings/${encodeURIComponent(bookingId)}`);
   },

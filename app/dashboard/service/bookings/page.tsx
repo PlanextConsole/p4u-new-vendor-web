@@ -71,6 +71,8 @@ function BookingCard({
       </div>
 
       {notes ? <p className="mb-2 text-xs text-muted-foreground">Note: {notes}</p> : null}
+      {row.metadata?.completionProof && typeof row.metadata.completionProof === "object" ? <p className="mb-2 rounded-lg bg-primary/5 px-2 py-1 text-xs text-primary">Completion: {String((row.metadata.completionProof as Record<string, unknown>).status || "pending").replace(/_/g, " ")}</p> : null}
+      {row.metadata?.dispute && typeof row.metadata.dispute === "object" ? <p className="mb-2 rounded-lg bg-destructive/10 px-2 py-1 text-xs text-destructive">Dispute: {String((row.metadata.dispute as Record<string, unknown>).status || "open")}</p> : null}
 
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-bold">{formatInr(row.totalAmount)}</p>
@@ -198,7 +200,18 @@ export default function VendorServiceBookingsPage() {
     setActionId(row.id);
     setErr("");
     try {
-      const updated = await vendorBookingsApi.updateStatus(row.id, decision);
+      let updated: VendorBookingRow;
+      if (decision === "completed") {
+        const photoUrl = window.prompt("Completion photo URL (required):")?.trim();
+        if (!photoUrl) throw new Error("A completion photo is required.");
+        const notes = window.prompt("Completion notes (optional):") || undefined;
+        await vendorBookingsApi.submitCompletionProof(row.id, [photoUrl], notes);
+        const otp = window.prompt("Enter the 6-digit completion OTP shown to the customer:")?.trim();
+        if (!otp || !/^\d{6}$/.test(otp)) throw new Error("Enter a valid 6-digit OTP.");
+        updated = await vendorBookingsApi.verifyCompletionOtp(row.id, otp);
+      } else {
+        updated = await vendorBookingsApi.updateStatus(row.id, decision);
+      }
       const nextStatus = String(updated.status || decision).toLowerCase();
       setItems((prev) => prev.map((r) => (r.id === row.id ? { ...r, status: nextStatus } : r)));
       await refreshCounts();

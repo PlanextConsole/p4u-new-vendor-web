@@ -42,4 +42,7 @@ export const vendorOrdersApi = {
       body,
     );
   },
+  updateReturn(orderId: string, action: "approve" | "reject" | "received", note?: string) {
+    return apiClient.patch<VendorCommerceOrder>(`${BASE}/orders/${encodeURIComponent(orderId)}/return`, { action, note });
+  },
 };
