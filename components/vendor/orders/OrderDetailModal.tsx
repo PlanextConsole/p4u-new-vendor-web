@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Building2, Package, Pencil, ShoppingCart, User, X } from "lucide-react";
+import { Building2, CreditCard, MapPin, Package, Pencil, Phone, ShoppingCart, User, X } from "lucide-react";
 import type { VendorCommerceOrder } from "@/lib/api/vendorOrders";
 import { vendorOrdersApi } from "@/lib/api/vendorOrders";
 import { resolveMediaUrl } from "@/lib/media";
@@ -75,6 +75,100 @@ export function customerName(meta: Record<string, unknown>): string {
   return "Customer";
 }
 
+export function customerPhone(
+  meta: Record<string, unknown>,
+  order?: VendorCommerceOrder | null,
+): string {
+  const top =
+    order && typeof (order as { customerPhone?: unknown }).customerPhone === "string"
+      ? String((order as { customerPhone?: string }).customerPhone).trim()
+      : "";
+  if (top) return top;
+  if (typeof meta.customerPhone === "string" && meta.customerPhone.trim()) return meta.customerPhone.trim();
+  if (typeof meta.customer_phone === "string" && meta.customer_phone.trim()) return meta.customer_phone.trim();
+  const addr = meta.shippingAddress ?? meta.shipping_address;
+  if (addr && typeof addr === "object" && !Array.isArray(addr)) {
+    const a = addr as Record<string, unknown>;
+    if (typeof a.phone === "string" && a.phone.trim()) return a.phone.trim();
+  }
+  const c = meta.customer;
+  if (c && typeof c === "object" && !Array.isArray(c)) {
+    const o = c as Record<string, unknown>;
+    const p =
+      (typeof o.phone === "string" && o.phone) ||
+      (typeof o.mobile === "string" && o.mobile) ||
+      "";
+    if (String(p).trim()) return String(p).trim();
+  }
+  return "";
+}
+
+export function paymentModeOf(
+  meta: Record<string, unknown>,
+  order?: VendorCommerceOrder | null,
+): string {
+  const top =
+    order && typeof (order as { paymentMode?: unknown }).paymentMode === "string"
+      ? String((order as { paymentMode?: string }).paymentMode).trim()
+      : "";
+  const raw =
+    top ||
+    (typeof meta.paymentMode === "string" && meta.paymentMode) ||
+    (typeof meta.payment_mode === "string" && meta.payment_mode) ||
+    "";
+  return String(raw).trim().toLowerCase();
+}
+
+export function paymentStatusOf(
+  meta: Record<string, unknown>,
+  order?: VendorCommerceOrder | null,
+): string {
+  const top =
+    order && typeof (order as { paymentStatus?: unknown }).paymentStatus === "string"
+      ? String((order as { paymentStatus?: string }).paymentStatus).trim()
+      : "";
+  const raw =
+    top ||
+    (typeof meta.paymentStatus === "string" && meta.paymentStatus) ||
+    (typeof meta.payment_status === "string" && meta.payment_status) ||
+    "";
+  return String(raw).trim().toLowerCase();
+}
+
+/** Unpaid online orders: status `created` or paymentStatus `pending`. */
+export function isAwaitingPayment(
+  order: VendorCommerceOrder,
+  meta?: Record<string, unknown>,
+): boolean {
+  const m = meta ?? metaRecord(order.metadata);
+  const status = String(order.status || "").toLowerCase();
+  const pay = paymentStatusOf(m, order);
+  const mode = paymentModeOf(m, order);
+  if (mode === "cod" || pay === "cod" || pay === "paid") return false;
+  return status === "created" || pay === "pending";
+}
+
+export function formatShippingAddress(
+  meta: Record<string, unknown>,
+  order?: VendorCommerceOrder | null,
+): string {
+  const top = order && (order as { shippingAddress?: unknown }).shippingAddress;
+  const raw = top ?? meta.shippingAddress ?? meta.shipping_address ?? meta.address;
+  if (typeof raw === "string" && raw.trim()) return raw.trim();
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return "";
+  const a = raw as Record<string, unknown>;
+  const s = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : "");
+  const parts = [
+    s(a.fullName) || s(a.name),
+    s(a.line1) || s(a.addressLine1) || s(a.street),
+    s(a.line2) || s(a.addressLine2),
+    [s(a.city), s(a.state)].filter(Boolean).join(", "),
+    s(a.pincode) || s(a.postalCode) || s(a.zip),
+    s(a.country),
+  ].filter(Boolean);
+  return parts.join(", ");
+}
+
 export function orderLines(meta: Record<string, unknown>) {
   const raw = meta.items ?? meta.lines;
   if (!Array.isArray(raw)) return [];
@@ -99,6 +193,19 @@ function lineQty(line: Record<string, unknown>): number {
 
 function nonEmptyStr(v: unknown): string {
   return typeof v === "string" && v.trim() ? v.trim() : "";
+}
+
+function paymentModeLabel(mode: string): string {
+  if (!mode) return "—";
+  if (mode === "cod") return "COD";
+  if (mode === "online" || mode === "upi" || mode === "card") return mode.toUpperCase();
+  return mode.replace(/_/g, " ");
+}
+
+function paymentStatusLabel(status: string, mode: string): string {
+  if (mode === "cod" || status === "cod") return "COD";
+  if (!status) return "—";
+  return status.replace(/_/g, " ");
 }
 
 /** Raw path/URL for a commerce order line (cart metadata is often nested under `metadata`). */
@@ -264,6 +371,11 @@ export function OrderDetailModal({
   if (!local) return null;
 
   const refLabel = displayOrderRef(local);
+  const payMode = paymentModeOf(meta, local);
+  const payStatus = paymentStatusOf(meta, local);
+  const phone = customerPhone(meta, local);
+  const shipAddr = formatShippingAddress(meta, local);
+  const awaitingPay = isAwaitingPayment(local, meta);
 
   return (
     <div
@@ -288,11 +400,18 @@ export function OrderDetailModal({
                 {refLabel}
               </h2>
               <p className="mt-0.5 text-sm text-muted-foreground">{formatDateTime(local.createdAt)}</p>
-              <span
-                className={`mt-2 inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${statusBadgeClass(local.status)}`}
-              >
-                {local.status.replace(/_/g, " ")}
-              </span>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <span
+                  className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${statusBadgeClass(local.status)}`}
+                >
+                  {local.status.replace(/_/g, " ")}
+                </span>
+                {awaitingPay ? (
+                  <span className="inline-block rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-900 ring-1 ring-amber-300">
+                    Awaiting payment
+                  </span>
+                ) : null}
+              </div>
             </div>
           </div>
           <button
@@ -333,6 +452,12 @@ export function OrderDetailModal({
                 <span className="text-xs font-medium text-muted-foreground">Customer</span>
               </div>
               <p className="mt-1 text-base font-semibold text-foreground">{customerName(meta)}</p>
+              {phone ? (
+                <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <Phone className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  {phone}
+                </p>
+              ) : null}
             </div>
             <div className="rounded-xl bg-muted/50 px-4 py-3 ring-1 ring-border">
               <div className="flex items-center gap-2 text-info">
@@ -340,6 +465,33 @@ export function OrderDetailModal({
                 <span className="text-xs font-medium text-muted-foreground">Vendor</span>
               </div>
               <p className="mt-1 text-base font-semibold text-foreground">{vendorDisplayName}</p>
+            </div>
+            <div className="rounded-xl bg-muted/50 px-4 py-3 ring-1 ring-border">
+              <div className="flex items-center gap-2 text-foreground">
+                <CreditCard className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                <span className="text-xs font-medium text-muted-foreground">Payment</span>
+              </div>
+              <p className="mt-1 text-base font-semibold capitalize text-foreground">
+                {paymentModeLabel(payMode)}
+                <span className="mx-1.5 text-muted-foreground">·</span>
+                <span className={awaitingPay ? "text-amber-700" : undefined}>
+                  {paymentStatusLabel(payStatus, payMode)}
+                </span>
+              </p>
+              {awaitingPay ? (
+                <p className="mt-1 text-xs font-medium text-amber-800">
+                  Do not ship until payment is confirmed.
+                </p>
+              ) : null}
+            </div>
+            <div className="rounded-xl bg-muted/50 px-4 py-3 ring-1 ring-border sm:col-span-1">
+              <div className="flex items-center gap-2 text-foreground">
+                <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                <span className="text-xs font-medium text-muted-foreground">Shipping address</span>
+              </div>
+              <p className="mt-1 text-sm font-medium leading-snug text-foreground">
+                {shipAddr || "—"}
+              </p>
             </div>
           </div>
 

@@ -10,9 +10,11 @@ import {
   customerName,
   displayOrderRef,
   formatInr,
+  isAwaitingPayment,
   metaRecord,
   orderLineThumbnailRaw,
   orderLines,
+  paymentModeOf,
 } from "@/components/vendor/orders/OrderDetailModal";
 import {
   VendorListEmpty,
@@ -215,15 +217,28 @@ export default function VendorProductOrdersPage() {
                 : typeof first.qty === "number"
                   ? first.qty
                   : 1);
+            const awaiting = isAwaitingPayment(o, m);
+            const payMode = paymentModeOf(m, o);
+            const dimNewUnpaid = tab === "new" && awaiting;
 
             return (
               <li key={o.id}>
-                <Card className="p-4">
+                <Card className={`p-4 ${dimNewUnpaid ? "opacity-80 ring-1 ring-amber-200" : ""}`}>
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-xs font-semibold">{displayOrderRef(o)}</span>
                         <VendorStatusBadge status={o.status} kind="order" />
+                        {awaiting ? (
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-900">
+                            Awaiting payment
+                          </span>
+                        ) : null}
+                        {payMode ? (
+                          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            {payMode === "cod" ? "COD" : payMode}
+                          </span>
+                        ) : null}
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">
                         {customerName(m)} · {formatListDate(o.createdAt)}
